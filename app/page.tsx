@@ -16,6 +16,7 @@ import {
   Clock,
   ArrowRight,
 } from "lucide-react";
+import { isEduEmail } from "@/lib/authRules";
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,15 @@ export default function Home() {
 
       if (!user) {
         setLoading(false);
+        return;
+      }
+
+      if (!user.email || !isEduEmail(user.email)) {
+        await supabase.auth.signOut();
+
+        setUser(null);
+        setLoading(false);
+
         return;
       }
 
