@@ -589,7 +589,7 @@ export default function LivePage() {
                   <Radio size={18} className="lv-tip-icon" />
                   <h3 className="lv-tip-heading">How it works</h3>
                   <p className="lv-tip-body">
-                    Once you go live, other students browsing your course can see where you are and join you on the spot — no scheduling needed.
+                    Once you go live, other students browsing your course can see where you are and join you on the spot. There is no scheduling needed.
                   </p>
                 </section>
               </div>
