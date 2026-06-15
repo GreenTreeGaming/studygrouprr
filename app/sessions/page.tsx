@@ -159,8 +159,18 @@ export default function SessionsPage() {
       ).toISOString();
 
       const { data: liveData } = await supabase
-        .from("live_study_status")
-        .select(`*, profiles (id, name, avatar_url, university)`)
+          .from("live_study_status")
+          .select(`
+    *,
+    profiles (
+      id,
+      name,
+      avatar_url,
+      university,
+      major,
+      year
+    )
+  `)
         .gte("created_at", twoHoursAgo)
         .order("created_at", { ascending: false });
 
@@ -381,20 +391,31 @@ export default function SessionsPage() {
                     <div className="sp-live-card-top">
                       <div className="sp-live-avatar-wrap">
                         <img
-                          src={student.profiles?.avatar_url}
-                          alt={student.profiles?.name}
-                          className="sp-live-avatar"
+                            src={student.profiles?.avatar_url}
+                            alt={student.profiles?.name}
+                            className="sp-live-avatar"
                         />
                         <span className="sp-live-avatar-dot" />
                       </div>
+
                       <div className="sp-live-card-info">
-                        <p className="sp-live-name">{student.profiles?.name}</p>
+                        <p className="sp-live-name">
+                          {student.profiles?.name}
+                        </p>
+
                         <Link
-                          href={`/courses/${student.course_code}`}
-                          className="sp-live-course"
+                            href={`/courses/${student.course_code}`}
+                            className="sp-live-course"
                         >
                           {student.course_code}
                         </Link>
+
+                        <p className="sp-live-major">
+                          {student.profiles?.major}
+                          {student.profiles?.year
+                              ? ` • ${student.profiles.year}`
+                              : ""}
+                        </p>
                       </div>
                     </div>
 
@@ -404,13 +425,27 @@ export default function SessionsPage() {
                     </div>
 
                     {student.description && (
-                      <details className="sp-live-details">
-                        <summary className="sp-live-summary">
-                          <BookOpen size={13} />
-                          Study details
-                        </summary>
-                        <p className="sp-live-desc">{student.description}</p>
-                      </details>
+                        <div className="sp-live-section-box">
+                          <p className="sp-live-label">
+                            Studying
+                          </p>
+
+                          <p className="sp-live-text">
+                            {student.description}
+                          </p>
+                        </div>
+                    )}
+
+                    {student.identification && (
+                        <div className="sp-live-section-box">
+                          <p className="sp-live-label">
+                            How to find me
+                          </p>
+
+                          <p className="sp-live-text">
+                            {student.identification}
+                          </p>
+                        </div>
                     )}
                     {buddyIds.has(student.user_id) ? (
                       <Link
@@ -852,12 +887,50 @@ const pageStyles = `
     appearance: none;
     -webkit-appearance: none;
   }
-  .sp-select:focus { border-color: var(--violet-mid); }
-  .sp-select--sm {
-    padding: 7px 12px 7px 12px;
-    font-size: 13px;
-    border-radius: 10px;
-  }
+  
+  .sp-live-major {
+  margin: 6px 0 0;
+
+  font-size: 12px;
+
+  color: var(--muted);
+}
+
+.sp-live-section-box {
+  margin-top: 10px;
+
+  padding: 10px;
+
+  border-radius: 10px;
+
+  background: rgba(255,255,255,0.65);
+
+  border: 1px solid rgba(255,255,255,0.9);
+}
+
+.sp-live-label {
+  margin: 0 0 4px;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.05em;
+
+  color: #059669;
+}
+
+.sp-live-text {
+  margin: 0;
+
+  font-size: 13px;
+
+  line-height: 1.45;
+
+  color: var(--text);
+}
 
   /* ── Cards ── */
   .sp-card {

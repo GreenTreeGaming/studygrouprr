@@ -30,6 +30,23 @@ type Session = {
   creator_id: string;
 };
 
+type LiveStudent = {
+  id: string;
+  user_id: string;
+  course_code: string;
+  location_name: string;
+  description: string | null;
+  identification: string | null;
+  created_at: string;
+
+  profiles: {
+    name: string | null;
+    avatar_url: string | null;
+    major: string | null;
+    year: string | null;
+  } | null;
+};
+
 export default function CoursePage() {
   const { loading: onboardingLoading } = useRequireOnboarding();
   const params = useParams();
@@ -47,6 +64,9 @@ export default function CoursePage() {
   const [savingCourse, setSavingCourse] = useState(false);
 
   const [alertOpen, setAlertOpen] = useState(false);
+
+  const [liveStudents, setLiveStudents] =
+      useState<LiveStudent[]>([]);
 
   const [alertConfig, setAlertConfig] = useState({
 
@@ -123,20 +143,54 @@ export default function CoursePage() {
 
     setSessions(activeSessions);
 
+    const students = new Set<string>();
+
+// Session creators
+    activeSessions.forEach((session) => {
+      students.add(session.creator_id);
+    });
+
+// Session attendees
     if (activeSessions.length > 0) {
       const sessionIds = activeSessions.map((s) => s.id);
-      const creators = new Set(activeSessions.map((s) => s.creator_id));
 
       const { data: members } = await supabase
-        .from("session_members")
-        .select("user_id, session_id")
-        .in("session_id", sessionIds);
+          .from("session_members")
+          .select("user_id")
+          .in("session_id", sessionIds);
 
-      members?.forEach((member) => creators.add(member.user_id));
-      setStudentCount(creators.size);
-    } else {
-      setStudentCount(0);
+      members?.forEach((member) => {
+        students.add(member.user_id);
+      });
     }
+
+// Live students in this course
+    const twoHoursAgo = new Date(
+        Date.now() - 2 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { data: liveStudentsData } =
+        await supabase
+            .from("live_study_status")
+            .select(`
+      *,
+      profiles (
+        name,
+        avatar_url,
+        major,
+        year
+      )
+    `)
+            .eq("course_code", courseCode)
+            .gte("created_at", twoHoursAgo);
+
+    liveStudentsData?.forEach((student) => {
+      students.add(student.user_id);
+    });
+
+    setLiveStudents(liveStudentsData || []);
+
+    setStudentCount(students.size);
 
     setLoading(false);
   }
@@ -338,6 +392,8 @@ export default function CoursePage() {
               )}
             </section>
 
+
+
             {/* ── Right col: stats ── */}
             <div className="cp-right-col">
               <div className="cp-stat-row">
@@ -356,6 +412,91 @@ export default function CoursePage() {
                   </div>
                 </div>
               </div>
+
+              <section className="cp-card">
+
+                <div className="cp-card-header">
+
+                  <h2 className="cp-card-title">
+
+                    Live Right Now
+
+                  </h2>
+
+                </div>
+
+                {liveStudents.length === 0 ? (
+
+                    <p className="cp-live-empty">
+
+                      Nobody is studying live right now.
+
+                    </p>
+
+                ) : (
+
+                    <div className="cp-live-list">
+
+                      {liveStudents.map((student) => (
+                          <div
+                              key={student.id}
+                              className="cp-live-card"
+                          >
+                            <div className="cp-live-header">
+                              <span className="cp-live-dot" />
+                              <span className="cp-live-badge">
+        Live
+      </span>
+                            </div>
+
+                            <div className="cp-live-user">
+                              <img
+                                  src={
+                                      student.profiles?.avatar_url ||
+                                      "/default-avatar.png"
+                                  }
+                                  alt=""
+                                  className="cp-live-avatar"
+                              />
+
+                              <div>
+                                <p className="cp-live-name">
+                                  {student.profiles?.name || "Student"}
+                                </p>
+
+                                <p className="cp-live-major">
+                                  {student.profiles?.major}
+                                  {student.profiles?.year
+                                      ? ` • ${student.profiles.year}`
+                                      : ""}
+                                </p>
+                              </div>
+                            </div>
+
+                            <p className="cp-live-location">
+                              <MapPin size={14} />
+                              {student.location_name}
+                            </p>
+
+                            {student.description && (
+                                <p className="cp-live-description">
+                                  {student.description}
+                                </p>
+                            )}
+
+                            {student.identification && (
+                                <p className="cp-live-identification">
+                                  {student.identification}
+                                </p>
+                            )}
+                          </div>
+                      ))}
+
+                    </div>
+
+                )}
+
+              </section>
 
               <section className="cp-card cp-cta-card">
                 <p className="cp-cta-heading">Start a {courseCode} session</p>
@@ -412,6 +553,32 @@ const coursePageStyles = `
     min-height: 100vh;
     color: var(--text);
   }
+  
+  .cp-live-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cp-live-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.cp-live-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.cp-live-major {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 
   /* ── Loading ── */
   .cp-loading-screen {
@@ -448,6 +615,79 @@ const coursePageStyles = `
   cursor: pointer;
 
   transition: all 0.15s ease;
+}
+
+.cp-live-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cp-live-card {
+  border: 1px solid #BBF7D0;
+  background: #F0FDF4;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.cp-live-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cp-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #10B981;
+}
+
+.cp-live-badge {
+  color: #059669;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cp-live-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cp-live-description {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.cp-live-identification {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cp-live-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.cp-live-card {
+  padding: 12px;
+}
+
+.cp-live-location {
+  margin: 0 0 6px;
+}
+
+.cp-live-identification {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .cp-btn-secondary:hover {

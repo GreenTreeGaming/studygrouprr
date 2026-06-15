@@ -169,10 +169,26 @@ export default function LivePage() {
     }
 
     const { data } = await supabase
-      .from("live_study_status")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+        .from("live_study_status")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+    const isExpired =
+        data &&
+        Date.now() -
+        new Date(data.created_at).getTime() >
+        2 * 60 * 60 * 1000;
+
+    if (isExpired) {
+      await supabase
+          .from("live_study_status")
+          .delete()
+          .eq("id", data.id);
+
+      setLiveStatus(null);
+      return;
+    }
 
     if (data) {
       setLiveStatus({
@@ -296,24 +312,20 @@ export default function LivePage() {
 
   function getTimeRemaining(createdAt: string) {
     const start = new Date(createdAt).getTime();
+    const expiresAt = start + 2 * 60 * 60 * 1000;
 
-    const expiresAt = start + 2 * 60 * 60 * 1000; // 2 hours
-    const remainingMs = expiresAt - Date.now();
+    const diff = expiresAt - Date.now();
 
-    if (remainingMs <= 0) {
+    if (diff <= 0) {
       return "Expired";
     }
 
-    const mins = Math.floor(remainingMs / 60000);
+    const mins = Math.floor(diff / 60000);
 
-    if (mins < 60) {
-      return `${mins} min`;
-    }
+    if (mins < 60) return `${mins} min`;
 
     const hours = Math.floor(mins / 60);
-    const remaining = mins % 60;
-
-    return `${hours}h ${remaining}m`;
+    return `${hours}h ${mins % 60}m`;
   }
 
   return (
