@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import BetaBanner from "@/components/BetaBanner";
 
 import "./globals.css";
+import Footer from "@/components/Footer";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -47,14 +48,16 @@ export default function RootLayout({
           </div>
 
           <div className="relative flex min-h-screen flex-col">
-  <BetaBanner />
+            <BetaBanner />
 
-  <Navbar />
+            <Navbar />
 
-  <main className="flex-1">
-    {children}
-  </main>
-</div>
+            <main className="flex-1">
+              {children}
+            </main>
+
+            <Footer />
+          </div>
         </div>
       </body>
     </html>
