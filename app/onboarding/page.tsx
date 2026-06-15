@@ -6,6 +6,9 @@ import { supabase } from "@/lib/supabase";
 import { ArrowRight, ChevronDown, GraduationCap, BookOpen, Calendar } from "lucide-react";
 import universities from "@/data/universities.json";
 import majors from "@/data/majors.json";
+import { isEduEmail } from "@/lib/authRules";
+import { useRouter } from "next/navigation";
+import AlertModal from "@/components/AlertModal";
 
 export default function OnboardingPage() {
   const [university, setUniversity] = useState("");
@@ -14,26 +17,81 @@ export default function OnboardingPage() {
   const [showUniversitySuggestions, setShowUniversitySuggestions] = useState(false);
   const [showMajorSuggestions, setShowMajorSuggestions] = useState(false);
   const [showYearOptions, setShowYearOptions] = useState(false);
+  const [checkingAuth, setCheckingAuth] =
+      useState(true);
+
+  const [pendingRedirect, setPendingRedirect] =
+      useState<string | null>(null);
+
+  const [alertOpen, setAlertOpen] = useState(false);
+
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as
+        | "success"
+        | "error"
+        | "warning"
+        | "info",
+  });
+
+  const router = useRouter();
+
+  function showAlert(
+      title: string,
+      message: string,
+      type:
+          | "success"
+          | "error"
+          | "warning"
+          | "info" = "info"
+  ) {
+    setAlertConfig({
+      title,
+      message,
+      type,
+    });
+
+    setAlertOpen(true);
+  }
 
   useEffect(() => {
     async function checkOnboarding() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        window.location.href = "/";
-        return;
-      }
+        if (!user) {
+          router.replace("/");
+          return;
+        }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_complete")
-        .eq("id", user.id)
-        .single();
+        if (!isEduEmail(user.email)) {
+          await supabase.auth.signOut();
 
-      if (profile?.onboarding_complete) {
-        window.location.href = "/dashboard";
+          setPendingRedirect("/");
+
+          showAlert(
+              "Student Email Required",
+              "StudyGrouprr is currently only available to students with a .edu email address.",
+              "warning"
+          );
+
+          return;
+        }
+
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarding_complete")
+            .eq("id", user.id)
+            .single();
+
+        if (profile?.onboarding_complete) {
+          router.push("/dashboard");
+        }
+      } finally {
+        setCheckingAuth(false);
       }
     }
 
@@ -83,7 +141,11 @@ export default function OnboardingPage() {
 
   const YEARS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"];
 
-  const exactMajorMatch = majors.find((m) => m.major === major);
+  const exactMajorMatch = majors.find(
+      (m) =>
+          m.major.toLowerCase() ===
+          major.trim().toLowerCase()
+  );
   const isCustomMajor = major.trim().length > 0 && !exactMajorMatch;
 
   async function completeOnboarding() {
@@ -93,41 +155,70 @@ export default function OnboardingPage() {
 
     if (!user) return;
 
-    const validUniversity = universities.some((school) => school.name === university);
+    const validUniversity = universities.some(
+        (school) =>
+            school.name.toLowerCase() ===
+            university.trim().toLowerCase()
+    );
     const customMajor = major.trim();
 
     if (!exactMajorMatch && !/^[a-zA-Z\s&\-()]+$/.test(customMajor)) {
-      alert("Please enter a valid major.");
+      showAlert(
+          "Invalid Major",
+          "Please enter a valid major.",
+          "error"
+      );
       return;
     }
 
     if (customMajor.length < 3) {
-      alert("Major must be at least 3 characters.");
+      showAlert(
+          "Major Too Short",
+          "Major must be at least 3 characters long.",
+          "error"
+      );
       return;
     }
 
     if (customMajor.length > 100) {
-      alert("Major is too long.");
+      showAlert(
+          "Major Too Long",
+          "Major must be fewer than 100 characters.",
+          "error"
+      );
       return;
     }
 
     if (!validUniversity) {
-      alert("Please select a university from the list.");
+      showAlert(
+          "Select a University",
+          "Please select a university from the provided list.",
+          "error"
+      );
       return;
     }
 
-    await supabase
-      .from("profiles")
-      .update({
-        university,
-        major,
-        major_is_custom: isCustomMajor,
-        year,
-        onboarding_complete: true,
-      })
-      .eq("id", user.id);
+    const { error } = await supabase
+        .from("profiles")
+        .update({
+          university,
+          major,
+          major_is_custom: isCustomMajor,
+          year,
+          onboarding_complete: true,
+        })
+        .eq("id", user.id);
 
-    window.location.href = "/dashboard";
+    if (error) {
+      showAlert(
+          "Unable to Save",
+          "Something went wrong while saving your profile. Please try again.",
+          "error"
+      );
+      return;
+    }
+
+    router.push("/dashboard");
   }
 
   useEffect(() => {
@@ -154,8 +245,12 @@ export default function OnboardingPage() {
 
   const canContinue = university.trim().length > 0 && major.trim().length >= 3 && year.length > 0;
 
+  if (checkingAuth && !alertOpen) {
+    return null;
+  }
+
   return (
-    <>
+      <>
       <style>{onboardStyles}</style>
       <main className="ob-root">
         <div ref={cardRef} className="onboard-card ob-card">
@@ -334,6 +429,23 @@ export default function OnboardingPage() {
           </div>
         </div>
       </main>
+        <AlertModal
+            open={alertOpen}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            type={alertConfig.type}
+            onClose={() => {
+              setAlertOpen(false);
+
+              if (pendingRedirect) {
+                const destination = pendingRedirect;
+
+                setPendingRedirect(null);
+
+                router.push(destination);
+              }
+            }}
+        />
     </>
   );
 }

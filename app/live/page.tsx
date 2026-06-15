@@ -13,6 +13,7 @@ import {
   normalizeCourseCode,
   isValidCourseCode,
 } from "@/lib/courseValidation";
+import AlertModal from "@/components/AlertModal";
 
 type LiveStatus = {
   id: string;
@@ -40,6 +41,36 @@ export default function LivePage() {
     description,
     identification,
   ].join(" ");
+
+  const [alertOpen, setAlertOpen] = useState(false);
+
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as
+        | "success"
+        | "error"
+        | "warning"
+        | "info",
+  });
+
+  function showAlert(
+      title: string,
+      message: string,
+      type:
+          | "success"
+          | "error"
+          | "warning"
+          | "info" = "info"
+  ) {
+    setAlertConfig({
+      title,
+      message,
+      type,
+    });
+
+    setAlertOpen(true);
+  }
 
   const validationErrors: string[] = [];
 
@@ -158,7 +189,11 @@ export default function LivePage() {
       return;
     }
     if (!courseCode || !location || !description || !identification) {
-      alert("Please fill out all fields.");
+      showAlert(
+          "Missing Information",
+          "Please fill out all fields before going live.",
+          "warning"
+      );
       return;
     }
 
@@ -166,8 +201,10 @@ export default function LivePage() {
         normalizeCourseCode(courseCode);
 
     if (!isValidCourseCode(normalizedCourseCode)) {
-      alert(
-          "Enter a valid course code (e.g. CS400, MATH340, BIO101)."
+      showAlert(
+          "Invalid Course Code",
+          "Enter a valid course code (e.g. CS400, MATH340, BIO101).",
+          "warning"
       );
       return;
     }
@@ -193,7 +230,11 @@ export default function LivePage() {
     setSaving(false);
 
     if (error) {
-      alert(error.message);
+      showAlert(
+          "Unable to Go Live",
+          error.message,
+          "error"
+      );
       return;
     }
 
@@ -544,6 +585,13 @@ export default function LivePage() {
           )}
         </div>
       </main>
+      <AlertModal
+          open={alertOpen}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          type={alertConfig.type}
+          onClose={() => setAlertOpen(false)}
+      />
     </>
   );
 }

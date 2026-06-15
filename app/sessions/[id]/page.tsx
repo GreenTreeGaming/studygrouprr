@@ -15,6 +15,7 @@ import {
   GraduationCap,
   Pencil,
 } from "lucide-react";
+import AlertModal from "@/components/AlertModal";
 
 type Session = {
   id: string;
@@ -22,6 +23,7 @@ type Session = {
   course_code: string;
   location_name: string;
   description: string | null;
+  identification: string | null;
   start_time: string;
   end_time: string;
   creator_id: string;
@@ -54,6 +56,36 @@ export default function SessionDetailsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
+
+  const [alertOpen, setAlertOpen] = useState(false);
+
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as
+        | "success"
+        | "error"
+        | "warning"
+        | "info",
+  });
+
+  function showAlert(
+      title: string,
+      message: string,
+      type:
+          | "success"
+          | "error"
+          | "warning"
+          | "info" = "info"
+  ) {
+    setAlertConfig({
+      title,
+      message,
+      type,
+    });
+
+    setAlertOpen(true);
+  }
 
   const id = params.id as string;
 
@@ -188,10 +220,33 @@ export default function SessionDetailsPage() {
 
     if (!user) return;
 
-    const { error } = await supabase.from("session_members").insert({
-      session_id: id,
-      user_id: user.id,
-    });
+    const { error } = await supabase
+
+        .from("session_members")
+
+        .insert({
+
+          session_id: id,
+
+          user_id: user.id,
+
+        });
+
+    if (error) {
+
+      showAlert(
+
+          "Unable to Join Session",
+
+          error.message,
+
+          "error"
+
+      );
+
+      return;
+
+    }
 
     if (!error) {
       setJoined(true);
@@ -209,10 +264,19 @@ export default function SessionDetailsPage() {
     if (!user) return;
 
     const { error } = await supabase
-      .from("session_members")
-      .delete()
-      .eq("session_id", id)
-      .eq("user_id", user.id);
+        .from("session_members")
+        .delete()
+        .eq("session_id", id)
+        .eq("user_id", user.id);
+
+    if (error) {
+      showAlert(
+          "Unable to Leave Session",
+          error.message,
+          "error"
+      );
+      return;
+    }
 
     if (!error) {
       setJoined(false);
@@ -240,8 +304,10 @@ export default function SessionDetailsPage() {
       .maybeSingle();
 
     if (existing) {
-      alert(
-        "You already have a pending or existing study buddy relationship."
+      showAlert(
+          "Already Connected",
+          "You already have a pending or existing study buddy relationship.",
+          "warning"
       );
       return;
     }
@@ -255,11 +321,19 @@ export default function SessionDetailsPage() {
       });
 
     if (error) {
-      alert(error.message);
+      showAlert(
+          "Unable to Send Request",
+          error.message,
+          "error"
+      );
       return;
     }
 
-    alert("Study buddy request sent!");
+    showAlert(
+        "Request Sent",
+        "Your study buddy request has been sent.",
+        "success"
+    );
   }
 
   if (loading || onboardingLoading) {
@@ -513,6 +587,13 @@ export default function SessionDetailsPage() {
           </div>
         </div>
       </main>
+      <AlertModal
+          open={alertOpen}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          type={alertConfig.type}
+          onClose={() => setAlertOpen(false)}
+      />
     </>
   );
 }

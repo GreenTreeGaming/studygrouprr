@@ -130,7 +130,23 @@ export default function LoginPage() {
               </div>
 
               <div className="lp-card-item lp-button-wrap">
+
                 <LoginButton />
+
+              </div>
+
+              <div className="lp-card-item lp-student-notice">
+
+                <GraduationCap size={16} />
+
+                <span>
+
+    StudyGrouprr is currently available only to students
+
+    with a university email address.
+
+  </span>
+
               </div>
 
               <div className="lp-card-item lp-privacy-box">
@@ -237,6 +253,23 @@ const loginStyles = `
     font-weight: 600;
     margin-bottom: 14px;
   }
+  .lp-student-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
+
+  border-radius: 14px;
+  padding: 12px 14px;
+
+  margin-bottom: 18px;
+
+  color: var(--violet);
+  font-size: 13px;
+  font-weight: 500;
+}
   .lp-floating-header--green { color: var(--green); }
   .lp-floating-header--violet { color: var(--violet); }
 

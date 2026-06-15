@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Trash2,
 } from "lucide-react";
+import AlertModal from "@/components/AlertModal";
 
 export default function EditSessionPage() {
   const router = useRouter();
@@ -40,6 +41,39 @@ export default function EditSessionPage() {
   const [saving, setSaving] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [identification, setIdentification] = useState("");
+
+  const [deleteOpen, setDeleteOpen] =
+      useState(false);
+
+  const [alertOpen, setAlertOpen] = useState(false);
+
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as
+        | "success"
+        | "error"
+        | "warning"
+        | "info",
+  });
+
+  function showAlert(
+      title: string,
+      message: string,
+      type:
+          | "success"
+          | "error"
+          | "warning"
+          | "info" = "info"
+  ) {
+    setAlertConfig({
+      title,
+      message,
+      type,
+    });
+
+    setAlertOpen(true);
+  }
 
   function normalizeCourseCode(input: string) {
     return input
@@ -273,7 +307,11 @@ export default function EditSessionPage() {
       !startTime ||
       !endTime
     ) {
-      alert("Please fill out all required fields.");
+      showAlert(
+          "Missing Information",
+          "Please fill out all required fields.",
+          "error"
+      );
       return;
     }
 
@@ -285,14 +323,20 @@ export default function EditSessionPage() {
             normalizedCourseCode
         )
     ) {
-      alert(
-          "Enter a valid course code (e.g. CS400, MATH340, BIO101)."
+      showAlert(
+          "Invalid Course Code",
+          "Enter a valid course code (e.g. CS400, MATH340, BIO101).",
+          "error"
       );
       return;
     }
 
     if (new Date(endTime) <= new Date(startTime)) {
-      alert("End time must be after start time.");
+      showAlert(
+          "Invalid Time Range",
+          "End time must be after start time.",
+          "error"
+      );
       return;
     }
 
@@ -314,7 +358,11 @@ export default function EditSessionPage() {
     setSaving(false);
 
     if (error) {
-      alert(error.message);
+      showAlert(
+          "Unable to Save Session",
+          error.message,
+          "error"
+      );
       return;
     }
 
@@ -322,13 +370,17 @@ export default function EditSessionPage() {
   }
 
   async function deleteSession() {
-    const confirmed = window.confirm("Delete this session permanently?");
-    if (!confirmed) return;
-
-    const { error } = await supabase.from("study_sessions").delete().eq("id", id);
+    const { error } = await supabase
+        .from("study_sessions")
+        .delete()
+        .eq("id", id);
 
     if (error) {
-      alert(error.message);
+      showAlert(
+          "Unable to Delete Session",
+          error.message,
+          "error"
+      );
       return;
     }
 
@@ -553,7 +605,10 @@ export default function EditSessionPage() {
                 {saving ? "Saving changes…" : "Save changes"}
               </button>
 
-              <button onClick={deleteSession} className="es-delete es-item">
+              <button
+                  onClick={() => setDeleteOpen(true)}
+                  className="es-delete es-item"
+              >
                 <Trash2 size={16} />
                 Delete session
               </button>
@@ -619,6 +674,44 @@ export default function EditSessionPage() {
           </div>
         </div>
       </main>
+      {deleteOpen && (
+          <div className="es-modal-backdrop">
+            <div className="es-modal">
+              <h3>Delete Session?</h3>
+
+              <p>
+                This will permanently delete this study
+                session and remove all attendees.
+              </p>
+
+              <div className="es-modal-actions">
+                <button
+                    onClick={() => setDeleteOpen(false)}
+                    className="es-modal-cancel"
+                >
+                  Cancel
+                </button>
+
+                <button
+                    onClick={async () => {
+                      setDeleteOpen(false);
+                      await deleteSession();
+                    }}
+                    className="es-modal-delete"
+                >
+                  Delete Session
+                </button>
+              </div>
+            </div>
+          </div>
+      )}
+      <AlertModal
+          open={alertOpen}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          type={alertConfig.type}
+          onClose={() => setAlertOpen(false)}
+      />
     </>
   );
 }
@@ -644,6 +737,65 @@ const esStyles = `
     min-height: 100vh;
     color: var(--text);
   }
+  
+  .es-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.es-modal {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.es-modal h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.es-modal p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.es-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.es-modal-cancel {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.es-modal-delete {
+  flex: 1;
+  border: none;
+  background: #EF4444;
+  color: white;
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
 
   /* Loading */
   .es-loading-screen {

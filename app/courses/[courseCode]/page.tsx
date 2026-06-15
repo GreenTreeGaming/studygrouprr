@@ -18,6 +18,7 @@ import {
   normalizeCourseCode,
   isValidCourseCode,
 } from "@/lib/courseValidation";
+import AlertModal from "@/components/AlertModal";
 
 type Session = {
   id: string;
@@ -44,6 +45,44 @@ export default function CoursePage() {
   const [studentCount, setStudentCount] = useState(0);
   const [isMyCourse, setIsMyCourse] = useState(false);
   const [savingCourse, setSavingCourse] = useState(false);
+
+  const [alertOpen, setAlertOpen] = useState(false);
+
+  const [alertConfig, setAlertConfig] = useState({
+
+    title: "",
+
+    message: "",
+
+    type: "info" as
+
+        | "success"
+
+        | "error"
+
+        | "warning"
+
+        | "info",
+
+  });
+
+  function showAlert(
+      title: string,
+      message: string,
+      type:
+          | "success"
+          | "error"
+          | "warning"
+          | "info" = "info"
+  ) {
+    setAlertConfig({
+      title,
+      message,
+      type,
+    });
+
+    setAlertOpen(true);
+  }
 
   useEffect(() => {
     loadCourse();
@@ -104,7 +143,11 @@ export default function CoursePage() {
 
   async function addToMyCourses() {
     if (!isValidCourseCode(courseCode)) {
-      alert("Invalid course code.");
+      showAlert(
+          "Invalid Course",
+          "This course code is not valid.",
+          "error"
+      );
       return;
     }
 
@@ -129,9 +172,19 @@ export default function CoursePage() {
         );
 
     if (error) {
-      console.error(error);
+      showAlert(
+          "Unable to Add Course",
+          error.message,
+          "error"
+      );
     } else {
       setIsMyCourse(true);
+
+      showAlert(
+          "Course Added",
+          `${courseCode} has been added to My Courses.`,
+          "success"
+      );
     }
 
     setSavingCourse(false);
@@ -322,6 +375,13 @@ export default function CoursePage() {
           </div>
         </div>
       </main>
+      <AlertModal
+          open={alertOpen}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          type={alertConfig.type}
+          onClose={() => setAlertOpen(false)}
+      />
     </>
   );
 }
