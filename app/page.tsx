@@ -45,13 +45,6 @@ export default function Home() {
 
       setUser(user);
 
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata.full_name,
-        avatar_url: user.user_metadata.avatar_url,
-      });
-
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
