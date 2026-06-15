@@ -1,0 +1,698 @@
+[
+  {
+    "major": "General Agriculture",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Agriculture Production And Management",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Agricultural Economics",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Animal Sciences",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Food Science",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Plant Science And Agronomy",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Soil Science",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Miscellaneous Agriculture",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Forestry",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Natural Resources Management",
+    "category": "Agriculture & Natural Resources"
+  },
+  {
+    "major": "Fine Arts",
+    "category": "Arts"
+  },
+  {
+    "major": "Drama And Theater Arts",
+    "category": "Arts"
+  },
+  {
+    "major": "Music",
+    "category": "Arts"
+  },
+  {
+    "major": "Visual And Performing Arts",
+    "category": "Arts"
+  },
+  {
+    "major": "Commercial Art And Graphic Design",
+    "category": "Arts"
+  },
+  {
+    "major": "Film Video And Photographic Arts",
+    "category": "Arts"
+  },
+  {
+    "major": "Studio Arts",
+    "category": "Arts"
+  },
+  {
+    "major": "Miscellaneous Fine Arts",
+    "category": "Arts"
+  },
+  {
+    "major": "Environmental Science",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Biology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Biochemical Sciences",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Botany",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Molecular Biology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Ecology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Genetics",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Microbiology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Pharmacology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Physiology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Zoology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Neuroscience",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Miscellaneous Biology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "Cognitive Science And Biopsychology",
+    "category": "Biology & Life Science"
+  },
+  {
+    "major": "General Business",
+    "category": "Business"
+  },
+  {
+    "major": "Accounting",
+    "category": "Business"
+  },
+  {
+    "major": "Actuarial Science",
+    "category": "Business"
+  },
+  {
+    "major": "Business Management And Administration",
+    "category": "Business"
+  },
+  {
+    "major": "Operations Logistics And E-Commerce",
+    "category": "Business"
+  },
+  {
+    "major": "Business Economics",
+    "category": "Business"
+  },
+  {
+    "major": "Marketing And Marketing Research",
+    "category": "Business"
+  },
+  {
+    "major": "Finance",
+    "category": "Business"
+  },
+  {
+    "major": "Human Resources And Personnel Management",
+    "category": "Business"
+  },
+  {
+    "major": "International Business",
+    "category": "Business"
+  },
+  {
+    "major": "Hospitality Management",
+    "category": "Business"
+  },
+  {
+    "major": "Management Information Systems And Statistics",
+    "category": "Business"
+  },
+  {
+    "major": "Miscellaneous Business & Medical Administration",
+    "category": "Business"
+  },
+  {
+    "major": "Communications",
+    "category": "Communications & Journalism"
+  },
+  {
+    "major": "Journalism",
+    "category": "Communications & Journalism"
+  },
+  {
+    "major": "Mass Media",
+    "category": "Communications & Journalism"
+  },
+  {
+    "major": "Advertising And Public Relations",
+    "category": "Communications & Journalism"
+  },
+  {
+    "major": "Communication Technologies",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Computer And Information Systems",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Computer Programming And Data Processing",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Computer Science",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Information Sciences",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Computer Administration Management And Security",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Computer Networking And Telecommunications",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Mathematics",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Applied Mathematics",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Statistics And Decision Science",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "Mathematics And Computer Science",
+    "category": "Computers & Mathematics"
+  },
+  {
+    "major": "General Education",
+    "category": "Education"
+  },
+  {
+    "major": "Educational Administration And Supervision",
+    "category": "Education"
+  },
+  {
+    "major": "School Student Counseling",
+    "category": "Education"
+  },
+  {
+    "major": "Elementary Education",
+    "category": "Education"
+  },
+  {
+    "major": "Mathematics Teacher Education",
+    "category": "Education"
+  },
+  {
+    "major": "Physical And Health Education Teaching",
+    "category": "Education"
+  },
+  {
+    "major": "Early Childhood Education",
+    "category": "Education"
+  },
+  {
+    "major": "Science And Computer Teacher Education",
+    "category": "Education"
+  },
+  {
+    "major": "Secondary Teacher Education",
+    "category": "Education"
+  },
+  {
+    "major": "Special Needs Education",
+    "category": "Education"
+  },
+  {
+    "major": "Social Science Or History Teacher Education",
+    "category": "Education"
+  },
+  {
+    "major": "Teacher Education: Multiple Levels",
+    "category": "Education"
+  },
+  {
+    "major": "Language And Drama Education",
+    "category": "Education"
+  },
+  {
+    "major": "Art And Music Education",
+    "category": "Education"
+  },
+  {
+    "major": "Miscellaneous Education",
+    "category": "Education"
+  },
+  {
+    "major": "Library Science",
+    "category": "Education"
+  },
+  {
+    "major": "Architecture",
+    "category": "Engineering"
+  },
+  {
+    "major": "General Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Aerospace Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Biological Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Architectural Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Biomedical Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Chemical Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Civil Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Computer Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Electrical Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Engineering Mechanics Physics And Science",
+    "category": "Engineering"
+  },
+  {
+    "major": "Environmental Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Geological And Geophysical Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Industrial And Manufacturing Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Materials Engineering And Materials Science",
+    "category": "Engineering"
+  },
+  {
+    "major": "Mechanical Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Metallurgical Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Mining And Mineral Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Naval Architecture And Marine Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Nuclear Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Petroleum Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Miscellaneous Engineering",
+    "category": "Engineering"
+  },
+  {
+    "major": "Engineering Technologies",
+    "category": "Engineering"
+  },
+  {
+    "major": "Engineering And Industrial Management",
+    "category": "Engineering"
+  },
+  {
+    "major": "Electrical Engineering Technology",
+    "category": "Engineering"
+  },
+  {
+    "major": "Industrial Production Technologies",
+    "category": "Engineering"
+  },
+  {
+    "major": "Mechanical Engineering Related Technologies",
+    "category": "Engineering"
+  },
+  {
+    "major": "Miscellaneous Engineering Technologies",
+    "category": "Engineering"
+  },
+  {
+    "major": "Materials Science",
+    "category": "Engineering"
+  },
+  {
+    "major": "Nutrition Sciences",
+    "category": "Health"
+  },
+  {
+    "major": "General Medical And Health Services",
+    "category": "Health"
+  },
+  {
+    "major": "Communication Disorders Sciences And Services",
+    "category": "Health"
+  },
+  {
+    "major": "Health And Medical Administrative Services",
+    "category": "Health"
+  },
+  {
+    "major": "Medical Assisting Services",
+    "category": "Health"
+  },
+  {
+    "major": "Medical Technologies Technicians",
+    "category": "Health"
+  },
+  {
+    "major": "Health And Medical Preparatory Programs",
+    "category": "Health"
+  },
+  {
+    "major": "Nursing",
+    "category": "Health"
+  },
+  {
+    "major": "Pharmacy Pharmaceutical Sciences And Administration",
+    "category": "Health"
+  },
+  {
+    "major": "Treatment Therapy Professions",
+    "category": "Health"
+  },
+  {
+    "major": "Community And Public Health",
+    "category": "Health"
+  },
+  {
+    "major": "Miscellaneous Health Medical Professions",
+    "category": "Health"
+  },
+  {
+    "major": "Area Ethnic And Civilization Studies",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Linguistics And Comparative Language And Literature",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "French German Latin And Other Common Foreign Language Studies",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Other Foreign Languages",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "English Language And Literature",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Composition And Rhetoric",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Liberal Arts",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Humanities",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Intercultural And International Studies",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Philosophy And Religious Studies",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Theology And Religious Vocations",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Anthropology And Archeology",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Art History And Criticism",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "History",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "United States History",
+    "category": "Humanities & Liberal Arts"
+  },
+  {
+    "major": "Cosmetology Services And Culinary Arts",
+    "category": "Industrial Arts & Consumer Services"
+  },
+  {
+    "major": "Family And Consumer Sciences",
+    "category": "Industrial Arts & Consumer Services"
+  },
+  {
+    "major": "Military Technologies",
+    "category": "Industrial Arts & Consumer Services"
+  },
+  {
+    "major": "Physical Fitness Parks Recreation And Leisure",
+    "category": "Industrial Arts & Consumer Services"
+  },
+  {
+    "major": "Construction Services",
+    "category": "Industrial Arts & Consumer Services"
+  },
+  {
+    "major": "\"Electrical",
+    "category": "MECHANICAL"
+  },
+  {
+    "major": "Transportation Sciences And Technologies",
+    "category": "Industrial Arts & Consumer Services"
+  },
+  {
+    "major": "Multi/Interdisciplinary Studies",
+    "category": "Interdisciplinary"
+  },
+  {
+    "major": "Court Reporting",
+    "category": "Law & Public Policy"
+  },
+  {
+    "major": "Pre-Law And Legal Studies",
+    "category": "Law & Public Policy"
+  },
+  {
+    "major": "Criminal Justice And Fire Protection",
+    "category": "Law & Public Policy"
+  },
+  {
+    "major": "Public Administration",
+    "category": "Law & Public Policy"
+  },
+  {
+    "major": "Public Policy",
+    "category": "Law & Public Policy"
+  },
+  {
+    "major": "N/A (Less Than Bachelor'S Degree)",
+    "category": "NA"
+  },
+  {
+    "major": "Physical Sciences",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Astronomy And Astrophysics",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Atmospheric Sciences And Meteorology",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Chemistry",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Geology And Earth Science",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Geosciences",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Oceanography",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Physics",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "Multi-Disciplinary Or General Science",
+    "category": "Physical Sciences"
+  },
+  {
+    "major": "\"Nuclear",
+    "category": "INDUSTRIAL RADIOLOGY"
+  },
+  {
+    "major": "Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Educational Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Clinical Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Counseling Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Industrial And Organizational Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Social Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Miscellaneous Psychology",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Human Services And Community Organization",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Social Work",
+    "category": "Psychology & Social Work"
+  },
+  {
+    "major": "Interdisciplinary Social Sciences",
+    "category": "Social Science"
+  },
+  {
+    "major": "General Social Sciences",
+    "category": "Social Science"
+  },
+  {
+    "major": "Economics",
+    "category": "Social Science"
+  },
+  {
+    "major": "Criminology",
+    "category": "Social Science"
+  },
+  {
+    "major": "Geography",
+    "category": "Social Science"
+  },
+  {
+    "major": "International Relations",
+    "category": "Social Science"
+  },
+  {
+    "major": "Political Science And Government",
+    "category": "Social Science"
+  },
+  {
+    "major": "Sociology",
+    "category": "Social Science"
+  },
+  {
+    "major": "Miscellaneous Social Sciences",
+    "category": "Social Science"
+  }
+]
