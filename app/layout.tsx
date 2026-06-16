@@ -25,6 +25,8 @@ export const metadata: Metadata = {
     description:
         "Find classmates, join study groups, and collaborate on campus.",
     icons: {
+        icon: "/iphonelogo.png",
+        shortcut: "/iphonelogo.png",
         apple: "/iphonelogo.png",
     },
 };
