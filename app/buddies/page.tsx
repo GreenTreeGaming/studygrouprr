@@ -59,8 +59,12 @@ export default function BuddiesPage() {
     const [liveStatuses, setLiveStatuses] =
         useState<Record<string, LiveStatus>>({});
 
+    const [recommendedBuddies, setRecommendedBuddies] =
+        useState<any[]>([]);
+
     useEffect(() => {
         if (!profile) return;
+
         loadData();
     }, [profile]);
 
@@ -71,20 +75,23 @@ export default function BuddiesPage() {
             data: { user },
         } = await supabase.auth.getUser();
 
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
         /* Incoming requests */
 
         const { data: requests } = await supabase
             .from("friendships")
             .select(`
-        *,
-        requester:profiles!friendships_requester_id_fkey (
-          id,
-          name,
-          avatar_url
-        )
-      `)
+      *,
+      requester:profiles!friendships_requester_id_fkey (
+        id,
+        name,
+        avatar_url
+      )
+    `)
             .eq("receiver_id", user.id)
             .eq("status", "pending");
 
@@ -108,6 +115,8 @@ export default function BuddiesPage() {
                     ? friendship.receiver_id
                     : friendship.requester_id
             ) || [];
+
+        const existingBuddyIds = new Set(buddyIds);
 
         if (buddyIds.length > 0) {
             const { data: buddyProfiles } = await supabase
@@ -139,7 +148,115 @@ export default function BuddiesPage() {
             setLiveStatuses({});
         }
 
+        // NEW
+        await loadStudyMatches();
+
         setLoading(false);
+    }
+
+    async function loadStudyMatches() {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) return;
+
+        const { data: myProfile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+
+        if (!myProfile) return;
+
+        const { data: myCourses } = await supabase
+            .from("user_courses")
+            .select("course_code")
+            .eq("user_id", user.id);
+
+        const myCourseCodes =
+            myCourses?.map((c) => c.course_code) || [];
+
+        const { data: allProfiles } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("university", myProfile.university)
+            .neq("id", user.id);
+
+        if (!allProfiles) return;
+
+        // Get friendships so we don't recommend existing buddies
+        const { data: friendships } = await supabase
+            .from("friendships")
+            .select("*")
+            .or(
+                `requester_id.eq.${user.id},receiver_id.eq.${user.id}`
+            );
+
+        const excludedIds = new Set<string>();
+
+        friendships?.forEach((friendship) => {
+            const otherUserId =
+                friendship.requester_id === user.id
+                    ? friendship.receiver_id
+                    : friendship.requester_id;
+
+            excludedIds.add(otherUserId);
+        });
+
+        const recommendations = [];
+
+        for (const candidate of allProfiles) {
+            if (excludedIds.has(candidate.id)) {
+                continue;
+            }
+
+            const { data: candidateCourses } = await supabase
+                .from("user_courses")
+                .select("course_code")
+                .eq("user_id", candidate.id);
+
+            const sharedCourses =
+                (candidateCourses || []).filter((course) =>
+                    myCourseCodes.includes(course.course_code)
+                );
+
+            let score = 0;
+
+            // Shared classes matter most
+            score += sharedCourses.length * 5;
+
+            // Same major
+            if (
+                candidate.major &&
+                myProfile.major &&
+                candidate.major === myProfile.major
+            ) {
+                score += 3;
+            }
+
+            // Same year
+            if (
+                candidate.year &&
+                myProfile.year &&
+                candidate.year === myProfile.year
+            ) {
+                score += 2;
+            }
+
+            recommendations.push({
+                ...candidate,
+                score,
+                sharedCourses,
+            });
+        }
+
+        setRecommendedBuddies(
+            recommendations
+                .filter((r) => r.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 20)
+        );
     }
 
     async function acceptRequest(id: string) {
@@ -150,6 +267,10 @@ export default function BuddiesPage() {
             })
             .eq("id", id);
 
+        window.dispatchEvent(
+            new CustomEvent("buddy-requests-changed")
+        );
+
         loadData();
     }
 
@@ -158,6 +279,10 @@ export default function BuddiesPage() {
             .from("friendships")
             .delete()
             .eq("id", id);
+
+        window.dispatchEvent(
+            new CustomEvent("buddy-requests-changed")
+        );
 
         loadData();
     }
@@ -175,6 +300,26 @@ export default function BuddiesPage() {
     }
 
     const liveCount = buddies.filter((buddy) => liveStatuses[buddy.id]).length;
+
+    async function sendBuddyRequest(
+        receiverId: string
+    ) {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) return;
+
+        await supabase
+            .from("friendships")
+            .insert({
+                requester_id: user.id,
+                receiver_id: receiverId,
+                status: "pending",
+            });
+
+        loadData();
+    }
 
     return (
         <>
@@ -324,6 +469,89 @@ export default function BuddiesPage() {
                                     </li>
                                 ))}
                             </ul>
+                        )}
+                    </section>
+
+                    <section className="card">
+                        <div className="card-header">
+                            <h2 className="card-title">
+                                Recommended Study Partners
+                            </h2>
+                        </div>
+
+                        {recommendedBuddies.length === 0 ? (
+                            <p className="muted-note">
+                                No recommendations yet.
+                            </p>
+                        ) : (
+                            <div className="match-list">
+                                {recommendedBuddies.map((match) => {
+                                    const maxScore = 15;
+
+                                    const matchPercent = Math.round(
+                                        (match.score / maxScore) * 100
+                                    );
+
+                                    return (
+                                        <div
+                                            key={match.id}
+                                            className="match-card"
+                                        >
+                                            <img
+                                                src={match.avatar_url}
+                                                className="match-avatar"
+                                            />
+
+                                            <div className="match-info">
+                                                <h3 className="match-name">
+                                                    {match.name}
+                                                </h3>
+
+                                                <p className="match-meta">
+                                                    {match.major}
+                                                    {match.year
+                                                        ? ` • ${match.year}`
+                                                        : ""}
+                                                </p>
+
+                                                <div className="match-score">
+                                                    {matchPercent}% Match
+                                                </div>
+
+                                                <div className="match-badges">
+                                                    {match.sharedCourses.length > 0 && (
+                                                        <span className="match-badge">
+                    {match.sharedCourses.length}
+                                                            {" "}Shared Courses
+                  </span>
+                                                    )}
+
+                                                    {match.major === profile?.major && (
+                                                        <span className="match-badge">
+                    Same Major
+                  </span>
+                                                    )}
+
+                                                    {match.year === profile?.year && (
+                                                        <span className="match-badge">
+                    Same Year
+                  </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                className="match-action"
+                                                onClick={() =>
+                                                    sendBuddyRequest(match.id)
+                                                }
+                                            >
+                                                Add Buddy
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </section>
 
@@ -854,4 +1082,131 @@ const buddyStyles = `
     .live-pulse::after, .mini-pulse { animation: none; }
     .action-primary:hover { transform: none; }
   }
+  
+  /* ── Recommended Study Partners ───────────────────────── */
+
+.match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.match-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  padding: 14px;
+
+  border: 1px solid var(--border);
+  border-radius: 14px;
+
+  background: var(--surface);
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.match-card:hover {
+  border-color: var(--violet-mid);
+  box-shadow: 0 2px 12px rgba(124,58,237,0.08);
+}
+
+.match-avatar {
+  width: 56px;
+  height: 56px;
+
+  border-radius: 999px;
+  object-fit: cover;
+
+  flex-shrink: 0;
+}
+
+.match-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.match-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.match-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.match-score {
+  display: inline-flex;
+  align-items: center;
+
+  background: var(--violet-lt);
+  color: var(--violet);
+
+  padding: 4px 10px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  margin-bottom: 8px;
+}
+
+.match-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.match-badge {
+  background: var(--bg);
+  color: var(--muted);
+
+  font-size: 11px;
+  font-weight: 600;
+
+  padding: 4px 8px;
+
+  border-radius: 999px;
+}
+
+.match-action {
+  flex-shrink: 0;
+
+  border: none;
+
+  background: var(--violet);
+  color: white;
+
+  padding: 10px 16px;
+
+  border-radius: 10px;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: background 0.15s ease;
+}
+
+.match-action:hover {
+  background: #6D28D9;
+}
+
+@media (max-width: 640px) {
+  .match-card {
+    flex-wrap: wrap;
+  }
+
+  .match-action {
+    width: 100%;
+  }
+}
 `;

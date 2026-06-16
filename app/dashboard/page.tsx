@@ -13,6 +13,26 @@ export default function DashboardPage() {
   const [liveSessions, setLiveSessions] = useState<any[]>([]);
   const [courses, setCourses] = useState<string[]>([]);
 
+  async function sendBuddyRequest(
+      receiverId: string
+  ) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    await supabase
+        .from("friendships")
+        .insert({
+          requester_id: user.id,
+          receiver_id: receiverId,
+          status: "pending",
+        });
+
+    alert("Buddy request sent!");
+  }
+
   async function loadCourses() {
     const { data } = await supabase
         .from("user_courses")

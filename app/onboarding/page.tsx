@@ -9,6 +9,13 @@ import majors from "@/data/majors.json";
 import { isEduEmail } from "@/lib/authRules";
 import { useRouter } from "next/navigation";
 import AlertModal from "@/components/AlertModal";
+import {
+  normalizeCourseCode,
+  isValidCourseCode,
+} from "@/lib/courseValidation";
+import {
+  containsInappropriateContent,
+} from "@/lib/contentModeration";
 
 export default function OnboardingPage() {
   const [university, setUniversity] = useState("");
@@ -19,6 +26,9 @@ export default function OnboardingPage() {
   const [showYearOptions, setShowYearOptions] = useState(false);
   const [checkingAuth, setCheckingAuth] =
       useState(true);
+
+  const [courses, setCourses] = useState<string[]>([]);
+  const [courseInput, setCourseInput] = useState("");
 
   const [pendingRedirect, setPendingRedirect] =
       useState<string | null>(null);
@@ -161,6 +171,17 @@ export default function OnboardingPage() {
             university.trim().toLowerCase()
     );
     const customMajor = major.trim();
+    if (
+        !exactMajorMatch &&
+        containsInappropriateContent(customMajor)
+    ) {
+      showAlert(
+          "Inappropriate Major",
+          "Please enter an appropriate major.",
+          "error"
+      );
+      return;
+    }
 
     if (!exactMajorMatch && !/^[a-zA-Z\s&\-()]+$/.test(customMajor)) {
       showAlert(
@@ -216,6 +237,23 @@ export default function OnboardingPage() {
           "error"
       );
       return;
+    }
+
+    if (courses.length > 0) {
+      const courseRows = courses.map((course) => ({
+        user_id: user.id,
+        course_code: course,
+      }));
+
+      const { error: courseError } = await supabase
+          .from("user_courses")
+          .upsert(courseRows, {
+            onConflict: "user_id,course_code",
+          });
+
+      if (courseError) {
+        console.error(courseError);
+      }
     }
 
     router.push("/dashboard");
@@ -370,6 +408,85 @@ export default function OnboardingPage() {
               </div>
             </div>
 
+            {/* Courses */}
+            <div className="onboard-item ob-field">
+              <label className="ob-label">
+                <BookOpen size={14} className="ob-label-icon" />
+                Courses This Semester
+              </label>
+
+              <div className="ob-course-row">
+                <input
+                    value={courseInput}
+                    onChange={(e) =>
+                        setCourseInput(e.target.value.toUpperCase())
+                    }
+                    placeholder="CS400"
+                    className="ob-input"
+                />
+
+                <button
+                    type="button"
+                    className="ob-course-add"
+                    onClick={() => {
+                      const normalized =
+                          normalizeCourseCode(courseInput);
+
+                      if (!isValidCourseCode(normalized)) {
+                        showAlert(
+                            "Invalid Course",
+                            "Please enter a valid course code.",
+                            "error"
+                        );
+                        return;
+                      }
+
+                      if (!courses.includes(normalized)) {
+                        setCourses([
+                          ...courses,
+                          normalized,
+                        ]);
+                      }
+
+                      setCourseInput("");
+                    }}
+                >
+                  Add
+                </button>
+              </div>
+
+              {courses.length > 0 && (
+                  <div className="ob-course-chips">
+                    {courses.map((course) => (
+                        <div
+                            key={course}
+                            className="ob-course-chip"
+                        >
+                          <span>{course}</span>
+
+                          <button
+                              type="button"
+                              className="ob-course-remove"
+                              onClick={() =>
+                                  setCourses(
+                                      courses.filter(
+                                          (c) => c !== course
+                                      )
+                                  )
+                              }
+                          >
+                            ×
+                          </button>
+                        </div>
+                    ))}
+                  </div>
+              )}
+
+              <p className="ob-university-hint">
+                Add the classes you're taking this semester.
+              </p>
+            </div>
+
             {/* Year */}
             <div className="onboard-item ob-field">
               <label className="ob-label">
@@ -516,6 +633,80 @@ const onboardStyles = `
     margin: 0;
     line-height: 1.5;
   }
+  
+  .ob-course-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ob-course-row .ob-input {
+  flex: 1;
+}
+
+.ob-course-add {
+  flex-shrink: 0;
+
+  background: var(--violet);
+  color: white;
+
+  border: none;
+  border-radius: 10px;
+
+  padding: 0 16px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: background 0.15s;
+}
+
+.ob-course-add:hover {
+  background: #6D28D9;
+}
+
+.ob-course-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ob-course-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  background: var(--violet-lt);
+  color: var(--violet);
+
+  border: 1px solid #DDD6FE;
+  border-radius: 999px;
+
+  padding: 6px 12px;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ob-course-remove {
+  border: none;
+  background: transparent;
+
+  color: var(--violet);
+
+  cursor: pointer;
+
+  font-size: 16px;
+  line-height: 1;
+
+  padding: 0;
+}
+
+.ob-course-remove:hover {
+  opacity: 0.7;
+}
 
   .ob-form {
     display: flex;

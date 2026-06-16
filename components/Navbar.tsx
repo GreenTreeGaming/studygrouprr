@@ -24,6 +24,48 @@ export default function Navbar() {
   const navRef = useRef<HTMLElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState(0);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    loadPendingRequests();
+
+    const refreshRequests = () => {
+      loadPendingRequests();
+    };
+
+    window.addEventListener(
+        "buddy-requests-changed",
+        refreshRequests
+    );
+
+    return () => {
+      window.removeEventListener(
+          "buddy-requests-changed",
+          refreshRequests
+      );
+    };
+  }, [profile]);
+
+  async function loadPendingRequests() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { count } = await supabase
+        .from("friendships")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .eq("receiver_id", user.id)
+        .eq("status", "pending");
+
+    setPendingRequests(count || 0);
+  }
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -127,9 +169,18 @@ export default function Navbar() {
                 Sessions
               </Link>
 
-              <Link href="/buddies" className="nav-item nb-link">
+              <Link href="/buddies" className="nav-item nb-link nb-link-buddies">
                 <Users size={15} />
-                Buddies
+
+                <span className="nb-buddies-label">
+    Buddies
+
+                  {pendingRequests > 0 && (
+                      <span className="nb-notification">
+        {pendingRequests}
+      </span>
+                  )}
+  </span>
               </Link>
             </div>
           )}
@@ -201,12 +252,17 @@ export default function Navbar() {
                   Sessions
                 </Link>
                 <Link
-                  href="/buddies"
-                  className="nb-mobile-link"
-                  onClick={() => setMobileOpen(false)}
+                    href="/buddies"
+                    className="nb-mobile-link"
                 >
                   <Users size={16} />
                   Study Buddies
+
+                  {pendingRequests > 0 && (
+                      <span className="nb-notification">
+      {pendingRequests}
+    </span>
+                  )}
                 </Link>
                 <Link
                   href="/profile"
@@ -556,4 +612,45 @@ const navStyles = `
     .nb-live-dot::after { animation: none; }
     .nb-btn-create:hover { transform: none; }
   }
+  
+  .nb-link-buddies {
+  position: relative;
+}
+
+.nb-notification {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 16px;
+  height: 16px;
+
+  padding: 0 4px;
+
+  border-radius: 999px;
+
+  background: #EF4444;
+  color: white;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  line-height: 1;
+}
+
+.nb-buddies-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@keyframes nb-badge-pulse {
+  0%,100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
 `;
