@@ -2,7 +2,7 @@ export function normalizeCourseCode(input: string) {
     return input
         .trim()
         .toUpperCase()
-        .replace(/\s+/g, "");
+        .replace(/[\s-]+/g, "");
 }
 
 export const COURSE_CODE_REGEX =

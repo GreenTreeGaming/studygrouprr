@@ -48,7 +48,10 @@ type LiveStudent = {
 };
 
 export default function CoursePage() {
-  const { loading: onboardingLoading } = useRequireOnboarding();
+  const {
+    profile,
+    loading: onboardingLoading,
+  } = useRequireOnboarding();
   const params = useParams();
   const router = useRouter();
 
@@ -105,94 +108,170 @@ export default function CoursePage() {
   }
 
   useEffect(() => {
-    loadCourse();
-  }, [courseCode]);
+    if (!profile?.university) {
+      return;
+    }
+
+    void loadCourse();
+  }, [courseCode, profile?.university]);
 
   async function loadCourse() {
     if (!isValidCourseCode(courseCode)) {
-      router.push("/sessions");
+      router.replace("/sessions");
+      return;
+    }
+
+    if (!profile?.university) {
       return;
     }
 
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (user) {
-      const { data: existing } = await supabase
+      if (userError) {
+        throw userError;
+      }
+
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const twoHoursAgo = new Date(
+          Date.now() - 2 * 60 * 60 * 1000
+      ).toISOString();
+
+      /*
+       * Determine whether this is one of the current user's courses.
+       */
+      const { data: existingCourse, error: courseError } = await supabase
           .from("user_courses")
           .select("course_code")
           .eq("user_id", user.id)
           .eq("course_code", courseCode)
           .maybeSingle();
 
-      setIsMyCourse(!!existing);
-    }
+      if (courseError) {
+        throw courseError;
+      }
 
-    const { data: sessionData } = await supabase
-      .from("study_sessions")
-      .select("*")
-      .eq("course_code", courseCode)
-      .order("start_time", { ascending: true });
+      setIsMyCourse(Boolean(existingCourse));
 
-    const activeSessions = (sessionData || []).filter(
-      (session) => new Date(session.end_time) > new Date()
-    );
+      /*
+       * Only return active sessions for this course and university.
+       */
+      const { data: sessionRows, error: sessionsError } = await supabase
+          .from("study_sessions")
+          .select(`
+        id,
+        title,
+        course_code,
+        location_name,
+        start_time,
+        end_time,
+        creator_id,
+        profiles!study_sessions_creator_id_fkey!inner (
+          university
+        )
+      `)
+          .eq("course_code", courseCode)
+          .eq("profiles.university", profile.university)
+          .gt("end_time", now)
+          .order("start_time", { ascending: true });
 
-    setSessions(activeSessions);
+      if (sessionsError) {
+        throw sessionsError;
+      }
 
-    const students = new Set<string>();
+      const activeSessions = (sessionRows ?? []) as Session[];
 
-// Session creators
-    activeSessions.forEach((session) => {
-      students.add(session.creator_id);
-    });
+      setSessions(activeSessions);
 
-// Session attendees
-    if (activeSessions.length > 0) {
-      const sessionIds = activeSessions.map((s) => s.id);
+      const studentIds = new Set<string>();
 
-      const { data: members } = await supabase
-          .from("session_members")
-          .select("user_id")
-          .in("session_id", sessionIds);
-
-      members?.forEach((member) => {
-        students.add(member.user_id);
+      activeSessions.forEach((session) => {
+        studentIds.add(session.creator_id);
       });
+
+      /*
+       * Only fetch attendees for the same-university sessions returned above.
+       */
+      const sessionIds = activeSessions.map((session) => session.id);
+
+      if (sessionIds.length > 0) {
+        const { data: members, error: membersError } = await supabase
+            .from("session_members")
+            .select("user_id")
+            .in("session_id", sessionIds);
+
+        if (membersError) {
+          throw membersError;
+        }
+
+        members?.forEach((member) => {
+          studentIds.add(member.user_id);
+        });
+      }
+
+      /*
+       * Only return live students from this university.
+       */
+      const { data: liveRows, error: liveError } = await supabase
+          .from("live_study_status")
+          .select(`
+        id,
+        user_id,
+        course_code,
+        location_name,
+        description,
+        identification,
+        created_at,
+        profiles!inner (
+          name,
+          avatar_url,
+          major,
+          year
+        )
+      `)
+          .eq("course_code", courseCode)
+          .eq("profiles.university", profile.university)
+          .gte("created_at", twoHoursAgo)
+          .order("created_at", { ascending: false });
+
+      if (liveError) {
+        throw liveError;
+      }
+
+      const liveStudentsForUniversity =
+          (liveRows ?? []) as LiveStudent[];
+
+      liveStudentsForUniversity.forEach((student) => {
+        studentIds.add(student.user_id);
+      });
+
+      setLiveStudents(liveStudentsForUniversity);
+      setStudentCount(studentIds.size);
+    } catch (error) {
+      console.error("Unable to load course:", error);
+
+      setSessions([]);
+      setLiveStudents([]);
+      setStudentCount(0);
+
+      showAlert(
+          "Unable to Load Course",
+          "This course could not be loaded. Please try again.",
+          "error"
+      );
+    } finally {
+      setLoading(false);
     }
-
-// Live students in this course
-    const twoHoursAgo = new Date(
-        Date.now() - 2 * 60 * 60 * 1000
-    ).toISOString();
-
-    const { data: liveStudentsData } =
-        await supabase
-            .from("live_study_status")
-            .select(`
-      *,
-      profiles (
-        name,
-        avatar_url,
-        major,
-        year
-      )
-    `)
-            .eq("course_code", courseCode)
-            .gte("created_at", twoHoursAgo);
-
-    liveStudentsData?.forEach((student) => {
-      students.add(student.user_id);
-    });
-
-    setLiveStudents(liveStudentsData || []);
-
-    setStudentCount(students.size);
-
-    setLoading(false);
   }
 
   async function addToMyCourses() {

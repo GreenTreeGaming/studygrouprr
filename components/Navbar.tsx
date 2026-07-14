@@ -1,656 +1,1013 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
-import { useProfile } from "@/hooks/useProfile";
-import { useEffect, useRef, useState } from "react";
-import { gsap } from "gsap";
+import { usePathname, useRouter } from "next/navigation";
+
 import {
+  BookOpen,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
   Plus,
   Radio,
-  LayoutDashboard,
-  BookOpen,
+  User,
   Users,
   X,
-  Menu,
-  User,
 } from "lucide-react";
 
+import { supabase } from "@/lib/supabase";
+import { useProfile } from "@/hooks/useProfile";
+
+const navigationItems = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    href: "/sessions",
+    label: "Sessions",
+    icon: BookOpen,
+  },
+  {
+    href: "/buddies",
+    label: "Buddies",
+    icon: Users,
+  },
+] as const;
+
 export default function Navbar() {
-  const { profile, loading } = useProfile();
+  const pathname = usePathname();
   const router = useRouter();
 
-  const navRef = useRef<HTMLElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const { profile, loading } = useProfile();
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState(0);
-
-  useEffect(() => {
-    if (!profile) return;
-
-    loadPendingRequests();
-
-    const refreshRequests = () => {
-      loadPendingRequests();
-    };
-
-    window.addEventListener(
-        "buddy-requests-changed",
-        refreshRequests
-    );
-
-    return () => {
-      window.removeEventListener(
-          "buddy-requests-changed",
-          refreshRequests
-      );
-    };
-  }, [profile]);
-
-  async function loadPendingRequests() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { count } = await supabase
-        .from("friendships")
-        .select("*", {
-          count: "exact",
-          head: true,
-        })
-        .eq("receiver_id", user.id)
-        .eq("status", "pending");
-
-    setPendingRequests(count || 0);
-  }
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.from(".nav-item", {
-        opacity: 0,
-        y: -12,
-        duration: 0.6,
-        stagger: 0.07,
-        ease: "power3.out",
-      });
-    }, navRef);
-
-    return () => ctx.revert();
-  }, []);
-
   const [isLive, setIsLive] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const profileInitial =
+      profile?.name?.trim().charAt(0).toUpperCase() || "S";
+
   useEffect(() => {
-    if (!profile) return;
+    setMobileOpen(false);
+  }, [pathname]);
 
-    checkLiveStatus();
-
-    const handleLiveStatusChange = () => {
-      checkLiveStatus();
-    };
-
-    window.addEventListener(
-      "live-status-changed",
-      handleLiveStatusChange
-    );
-
-    return () => {
-      window.removeEventListener(
-        "live-status-changed",
-        handleLiveStatusChange
-      );
-    };
-  }, [profile]);
-
-  async function checkLiveStatus() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("live_study_status")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error(error);
+  useEffect(() => {
+    if (!mobileOpen) {
       return;
     }
 
-    setIsLive(!!data);
-  }
-
-  useEffect(() => {
-    if (!mobileMenuRef.current) return;
-    if (mobileOpen) {
-      gsap.fromTo(
-        mobileMenuRef.current,
-        { opacity: 0, y: -10 },
-        { opacity: 1, y: 0, duration: 0.25, ease: "power3.out" }
-      );
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+      }
     }
+
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!profile?.id) {
+      setPendingRequests(0);
+      setIsLive(false);
+      return;
+    }
+
+    let active = true;
+
+    async function loadNavbarState() {
+      const [requestsResult, liveResult] = await Promise.all([
+        supabase
+            .from("friendships")
+            .select("requester_id", {
+              count: "exact",
+              head: true,
+            })
+            .eq("receiver_id", profile!.id)
+            .eq("status", "pending"),
+
+        supabase
+            .from("live_study_status")
+            .select("id")
+            .eq("user_id", profile!.id)
+            .maybeSingle(),
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      if (requestsResult.error) {
+        console.error(
+            "Unable to load pending buddy requests:",
+            requestsResult.error
+        );
+      } else {
+        setPendingRequests(requestsResult.count ?? 0);
+      }
+
+      if (liveResult.error) {
+        console.error(
+            "Unable to load live study status:",
+            liveResult.error
+        );
+      } else {
+        setIsLive(Boolean(liveResult.data));
+      }
+    }
+
+    function refreshBuddyRequests() {
+      void loadNavbarState();
+    }
+
+    function refreshLiveStatus() {
+      void loadNavbarState();
+    }
+
+    void loadNavbarState();
+
+    window.addEventListener(
+        "buddy-requests-changed",
+        refreshBuddyRequests
+    );
+
+    window.addEventListener(
+        "live-status-changed",
+        refreshLiveStatus
+    );
+
+    return () => {
+      active = false;
+
+      window.removeEventListener(
+          "buddy-requests-changed",
+          refreshBuddyRequests
+      );
+
+      window.removeEventListener(
+          "live-status-changed",
+          refreshLiveStatus
+      );
+    };
+  }, [profile?.id]);
+
+  function isRouteActive(href: string) {
+    if (href === "/dashboard") {
+      return pathname === href;
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
   async function signOut() {
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    if (signingOut) {
+      return;
+    }
+
+    setSigningOut(true);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+
+      setMobileOpen(false);
+      router.replace("/");
+      router.refresh();
+    } catch (error) {
+      console.error("Unable to sign out:", error);
+      setSigningOut(false);
+    }
   }
 
   return (
-    <>
-      <style>{navStyles}</style>
-      <header ref={navRef} className="nb-header">
-        <nav className="nb-nav">
+      <>
+        <style>{navbarStyles}</style>
 
-          {/* Logo */}
-          <Link
-            href={profile ? "/dashboard" : "/"}
-            className="nav-item nb-logo"
-          >
-            Study<span className="nb-logo-accent">Grouprr</span>
-          </Link>
+        <header className="nb-header">
+          <nav className="nb-nav" aria-label="Main navigation">
+            <Link
+                href={profile ? "/dashboard" : "/"}
+                className="nb-brand"
+                aria-label="StudyGrouprr home"
+            >
+            <span className="nb-brand-icon" aria-hidden="true">
+              <BookOpen size={18} strokeWidth={2.4} />
+            </span>
 
-          {/* Desktop center links */}
-          {profile && (
-            <div className="nb-links">
-              <Link href="/dashboard" className="nav-item nb-link">
-                <LayoutDashboard size={15} />
-                Dashboard
-              </Link>
+              <span className="nb-brand-name">StudyGrouprr</span>
+            </Link>
 
-              <Link href="/sessions" className="nav-item nb-link">
-                <BookOpen size={15} />
-                Sessions
-              </Link>
+            {profile && (
+                <div className="nb-desktop-links">
+                  {navigationItems.map((item) => {
+                    const Icon = item.icon;
+                    const activeRoute = isRouteActive(item.href);
 
-              <Link href="/buddies" className="nav-item nb-link nb-link-buddies">
-                <Users size={15} />
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={[
+                              "nb-link",
+                              activeRoute ? "nb-link--active" : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            aria-current={activeRoute ? "page" : undefined}
+                        >
+                          <Icon size={15} />
 
-                <span className="nb-buddies-label">
-    Buddies
+                          <span>{item.label}</span>
 
-                  {pendingRequests > 0 && (
-                      <span className="nb-notification">
-        {pendingRequests}
-      </span>
-                  )}
-  </span>
-              </Link>
-            </div>
-          )}
-
-          {/* Desktop right */}
-          <div className="nb-right">
-            {profile ? (
-              <>
-                <Link href="/live" className="nav-item nb-btn-live">
-                  {isLive ? "You Are Live" : "Go Live"}
-                </Link>
-
-                <Link href="/create-session" className="nav-item nb-btn-create">
-                  <Plus size={16} strokeWidth={2.5} />
-                  Create
-                </Link>
-
-                <Link href="/profile" className="nav-item nb-avatar-wrap">
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.name}
-                    className="nb-avatar"
-                  />
-                </Link>
-
-                <button onClick={signOut} className="nav-item nb-logout">
-                  Logout
-                </button>
-              </>
-            ) : (
-              !loading && (
-                <Link href="/login" className="nav-item nb-btn-create">
-                  Login
-                </Link>
-              )
-            )}
-          </div>
-
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="nb-hamburger md-hide"
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-        </nav>
-
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div ref={mobileMenuRef} className="nb-mobile">
-            {profile ? (
-              <>
-                <div className="nb-mobile-user">
-                  <img src={profile.avatar_url} alt={profile.name} className="nb-mobile-avatar" />
-                  <div>
-                    <p className="nb-mobile-name">{profile.name}</p>
-                  </div>
+                          {item.href === "/buddies" &&
+                              pendingRequests > 0 && (
+                                  <span
+                                      className="nb-notification"
+                                      aria-label={`${pendingRequests} pending buddy ${
+                                          pendingRequests === 1
+                                              ? "request"
+                                              : "requests"
+                                      }`}
+                                  >
+                          {pendingRequests > 9
+                              ? "9+"
+                              : pendingRequests}
+                        </span>
+                              )}
+                        </Link>
+                    );
+                  })}
                 </div>
-
-                <div className="nb-mobile-divider" />
-
-                <Link href="/dashboard" className="nb-mobile-link" onClick={() => setMobileOpen(false)}>
-                  <LayoutDashboard size={16} />
-                  Dashboard
-                </Link>
-                <Link href="/sessions" className="nb-mobile-link" onClick={() => setMobileOpen(false)}>
-                  <BookOpen size={16} />
-                  Sessions
-                </Link>
-                <Link
-                    href="/buddies"
-                    className="nb-mobile-link"
-                >
-                  <Users size={16} />
-                  Study Buddies
-
-                  {pendingRequests > 0 && (
-                      <span className="nb-notification">
-      {pendingRequests}
-    </span>
-                  )}
-                </Link>
-                <Link
-                  href="/profile"
-                  className="nb-mobile-link"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <User size={16} />
-                  Profile
-                </Link>
-
-                <div className="nb-mobile-divider" />
-
-                <Link
-                  href="/live"
-                  className="nb-mobile-btn nb-mobile-btn--live"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {isLive && <span className="nb-live-dot" />}
-                  {isLive ? "You Are Live" : "Go Live"}
-                </Link>
-                <Link href="/create-session" className="nb-mobile-btn nb-mobile-btn--create" onClick={() => setMobileOpen(false)}>
-                  <Plus size={16} strokeWidth={2.5} />
-                  Create Session
-                </Link>
-
-                <button onClick={signOut} className="nb-mobile-logout">
-                  Logout
-                </button>
-              </>
-            ) : (
-              !loading && (
-                <Link href="/login" className="nb-mobile-btn nb-mobile-btn--create">
-                  Login
-                </Link>
-              )
             )}
-          </div>
-        )}
-      </header>
-    </>
+
+            <div className="nb-desktop-actions">
+              {profile ? (
+                  <>
+                    <Link
+                        href="/live"
+                        className={[
+                          "nb-live-button",
+                          isLive ? "nb-live-button--active" : "",
+                        ]
+                            .filter(Boolean)
+                            .join(" ")}
+                    >
+                  <span
+                      className={[
+                        "nb-live-dot",
+                        isLive ? "nb-live-dot--active" : "",
+                      ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      aria-hidden="true"
+                  />
+
+                      {isLive ? "You’re live" : "Go live"}
+                    </Link>
+
+                    <Link
+                        href="/create-session"
+                        className="nb-create-button"
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                      Create
+                    </Link>
+
+                    <Link
+                        href="/profile"
+                        className={[
+                          "nb-profile-link",
+                          isRouteActive("/profile")
+                              ? "nb-profile-link--active"
+                              : "",
+                        ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        aria-label="Open profile"
+                    >
+                      {profile.avatar_url ? (
+                          <img
+                              src={profile.avatar_url}
+                              alt=""
+                              className="nb-avatar"
+                              referrerPolicy="no-referrer"
+                          />
+                      ) : (
+                          <span className="nb-avatar-fallback">
+                      {profileInitial}
+                    </span>
+                      )}
+                    </Link>
+
+                    <button
+                        type="button"
+                        onClick={() => void signOut()}
+                        className="nb-logout-button"
+                        disabled={signingOut}
+                        aria-label="Sign out"
+                        title="Sign out"
+                    >
+                      <LogOut size={17} />
+                    </button>
+                  </>
+              ) : (
+                  !loading && (
+                      <Link href="/login" className="nb-login-button">
+                        Sign in
+                        <LogIn size={16} />
+                      </Link>
+                  )
+              )}
+            </div>
+
+            <button
+                type="button"
+                className="nb-menu-button"
+                onClick={() => setMobileOpen((current) => !current)}
+                aria-expanded={mobileOpen}
+                aria-controls="study-grouprr-mobile-menu"
+                aria-label={
+                  mobileOpen
+                      ? "Close navigation menu"
+                      : "Open navigation menu"
+                }
+            >
+              {mobileOpen ? <X size={21} /> : <Menu size={21} />}
+            </button>
+          </nav>
+
+          {mobileOpen && (
+              <div
+                  id="study-grouprr-mobile-menu"
+                  className="nb-mobile-menu"
+              >
+                {profile ? (
+                    <>
+                      <div className="nb-mobile-profile">
+                        <div className="nb-mobile-avatar-wrap">
+                          {profile.avatar_url ? (
+                              <img
+                                  src={profile.avatar_url}
+                                  alt=""
+                                  className="nb-mobile-avatar"
+                                  referrerPolicy="no-referrer"
+                              />
+                          ) : (
+                              <span className="nb-mobile-avatar-fallback">
+                        {profileInitial}
+                      </span>
+                          )}
+                        </div>
+
+                        <div className="nb-mobile-profile-copy">
+                          <p className="nb-mobile-name">
+                            {profile.name || "Student"}
+                          </p>
+
+                          <p className="nb-mobile-university">
+                            {profile.university || "StudyGrouprr"}
+                          </p>
+                        </div>
+
+                        <Link
+                            href="/profile"
+                            className="nb-mobile-profile-link"
+                            aria-label="Open profile"
+                        >
+                          <User size={17} />
+                        </Link>
+                      </div>
+
+                      <div className="nb-mobile-divider" />
+
+                      <div className="nb-mobile-links">
+                        {navigationItems.map((item) => {
+                          const Icon = item.icon;
+                          const activeRoute = isRouteActive(item.href);
+
+                          return (
+                              <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  className={[
+                                    "nb-mobile-link",
+                                    activeRoute
+                                        ? "nb-mobile-link--active"
+                                        : "",
+                                  ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                  aria-current={
+                                    activeRoute ? "page" : undefined
+                                  }
+                              >
+                                <Icon size={17} />
+
+                                <span>{item.label}</span>
+
+                                {item.href === "/buddies" &&
+                                    pendingRequests > 0 && (
+                                        <span className="nb-mobile-notification">
+                              {pendingRequests > 9
+                                  ? "9+"
+                                  : pendingRequests}
+                            </span>
+                                    )}
+                              </Link>
+                          );
+                        })}
+                      </div>
+
+                      <div className="nb-mobile-divider" />
+
+                      <div className="nb-mobile-actions">
+                        <Link
+                            href="/live"
+                            className={[
+                              "nb-mobile-action",
+                              "nb-mobile-action--live",
+                              isLive
+                                  ? "nb-mobile-action--live-active"
+                                  : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                        >
+                          <Radio size={17} />
+
+                          {isLive ? "You’re live" : "Go live"}
+                        </Link>
+
+                        <Link
+                            href="/create-session"
+                            className="nb-mobile-action nb-mobile-action--create"
+                        >
+                          <Plus size={17} strokeWidth={2.5} />
+                          Create session
+                        </Link>
+
+                        <button
+                            type="button"
+                            onClick={() => void signOut()}
+                            className="nb-mobile-logout"
+                            disabled={signingOut}
+                        >
+                          <LogOut size={17} />
+
+                          {signingOut
+                              ? "Signing out…"
+                              : "Sign out"}
+                        </button>
+                      </div>
+                    </>
+                ) : (
+                    !loading && (
+                        <div className="nb-mobile-guest">
+                          <p>Find classmates and study together.</p>
+
+                          <Link
+                              href="/login"
+                              className="nb-mobile-action nb-mobile-action--create"
+                          >
+                            Sign in
+                            <LogIn size={17} />
+                          </Link>
+                        </div>
+                    )
+                )}
+              </div>
+          )}
+        </header>
+      </>
   );
 }
 
-const navStyles = `
-  /* ── Tokens (match dashboard) ── */
+const navbarStyles = `
   .nb-header {
-    --indigo:     #1B1B3A;
-    --violet:     #7C3AED;
-    --violet-lt:  #EDE9FE;
-    --violet-mid: #A78BFA;
-    --green:      #10B981;
-    --red:        #EF4444;
-    --border:     #E4E2F0;
-    --text:       #1B1B3A;
-    --muted:      #64748B;
-    --surface:    #FFFFFF;
+    --nb-indigo: #1b1b3a;
+    --nb-violet: #7c3aed;
+    --nb-violet-dark: #6d28d9;
+    --nb-violet-light: #f5f3ff;
+    --nb-green: #10b981;
+    --nb-green-light: #ecfdf5;
+    --nb-red: #ef4444;
+    --nb-red-light: #fef2f2;
+    --nb-border: #e7e5ef;
+    --nb-border-strong: #d9d6e7;
+    --nb-text: #1b1b3a;
+    --nb-muted: #64748b;
+    --nb-faint: #94a3b8;
+    --nb-surface: #ffffff;
 
     position: sticky;
     top: 0;
     z-index: 50;
-    padding: 12px 16px;
+    width: 100%;
+    border-bottom: 1px solid rgba(231, 229, 239, 0.85);
+    background: rgba(248, 247, 252, 0.9);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
-  /* ── Nav bar ── */
+  .nb-header *,
+  .nb-header *::before,
+  .nb-header *::after {
+    box-sizing: border-box;
+  }
+
   .nb-nav {
-    max-width: 1100px;
+    display: flex;
+    width: min(1160px, calc(100% - 40px));
+    min-height: 68px;
     margin: 0 auto;
-    display: flex;
     align-items: center;
-    gap: 8px;
-    background: rgba(255,255,255,0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 10px 16px;
-    box-shadow: 0 4px 24px rgba(27,27,58,0.08);
+    gap: 18px;
   }
 
-  /* ── Logo ── */
-  .nb-logo {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    color: var(--indigo);
-    text-decoration: none;
-    flex-shrink: 0;
-  }
-  .nb-logo-accent { color: var(--violet); }
-
-  /* ── Center links ── */
-  .nb-links {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    margin-left: 16px;
-    flex: 1;
-  }
-  .nb-link {
+  .nb-brand {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
+    gap: 10px;
+    color: var(--nb-indigo);
     text-decoration: none;
-    padding: 7px 12px;
-    border-radius: 10px;
-    transition: color 0.15s, background 0.15s;
-  }
-  .nb-link:hover {
-    color: var(--violet);
-    background: var(--violet-lt);
   }
 
-  /* ── Right side ── */
-  .nb-right {
+  .nb-brand-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--nb-indigo);
+    color: white;
+    box-shadow: 0 6px 16px rgba(27, 27, 58, 0.12);
+  }
+
+  .nb-brand-name {
+    font-size: 16px;
+    font-weight: 760;
+    letter-spacing: -0.025em;
+  }
+
+  .nb-desktop-links {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 14px;
+  }
+
+  .nb-link {
+    position: relative;
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 11px;
+    border-radius: 10px;
+    color: var(--nb-muted);
+    font-size: 13px;
+    font-weight: 580;
+    text-decoration: none;
+    transition:
+      background 150ms ease,
+      color 150ms ease;
+  }
+
+  .nb-link:hover {
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--nb-indigo);
+  }
+
+  .nb-link--active {
+    background: var(--nb-violet-light);
+    color: var(--nb-violet);
+  }
+
+  .nb-link--active:hover {
+    background: #ede9fe;
+    color: var(--nb-violet-dark);
+  }
+
+  .nb-notification,
+  .nb-mobile-notification {
+    display: inline-flex;
+    min-width: 17px;
+    height: 17px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--nb-red);
+    color: white;
+    font-size: 9px;
+    font-weight: 750;
+    line-height: 1;
+  }
+
+  .nb-desktop-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-left: auto;
   }
 
-  /* Go Live button */
-  .nb-btn-live {
+  .nb-live-button,
+  .nb-create-button,
+  .nb-login-button {
     display: inline-flex;
+    min-height: 38px;
     align-items: center;
-    gap: 7px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--green);
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
-    padding: 7px 14px;
+    justify-content: center;
     border-radius: 10px;
+    font-size: 12px;
+    font-weight: 680;
     text-decoration: none;
-    transition: background 0.15s, border-color 0.15s;
-  }
-  .nb-btn-live:hover {
-    background: #D1FAE5;
-    border-color: #6EE7B7;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      transform 150ms ease,
+      box-shadow 150ms ease;
   }
 
-  /* Live dot */
+  .nb-live-button {
+    gap: 7px;
+    padding: 0 12px;
+    border: 1px solid #d1fae5;
+    background: rgba(236, 253, 245, 0.72);
+    color: #047857;
+  }
+
+  .nb-live-button:hover,
+  .nb-live-button--active {
+    border-color: #a7f3d0;
+    background: var(--nb-green-light);
+  }
+
   .nb-live-dot {
     width: 7px;
     height: 7px;
+    border: 1.5px solid #059669;
     border-radius: 50%;
-    background: var(--green);
-    position: relative;
-    flex-shrink: 0;
-  }
-  .nb-live-dot::after {
-    content: '';
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    background: var(--green);
-    opacity: 0.35;
-    animation: nb-pulse 1.4s ease-out infinite;
-  }
-  @keyframes nb-pulse {
-    0%   { transform: scale(1); opacity: 0.35; }
-    70%  { transform: scale(2.2); opacity: 0; }
-    100% { transform: scale(1); opacity: 0; }
+    background: transparent;
   }
 
-  /* Create button */
-  .nb-btn-create {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #fff;
-    background: var(--violet);
-    padding: 7px 14px;
-    border-radius: 10px;
-    text-decoration: none;
-    transition: background 0.15s, transform 0.1s;
+  .nb-live-dot--active {
+    border-color: var(--nb-green);
+    background: var(--nb-green);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
   }
-  .nb-btn-create:hover {
-    background: #6D28D9;
+
+  .nb-create-button,
+  .nb-login-button {
+    gap: 7px;
+    padding: 0 14px;
+    background: var(--nb-violet);
+    color: white;
+    box-shadow: 0 7px 18px rgba(124, 58, 237, 0.17);
+  }
+
+  .nb-create-button:hover,
+  .nb-login-button:hover {
     transform: translateY(-1px);
+    background: var(--nb-violet-dark);
+    box-shadow: 0 10px 23px rgba(124, 58, 237, 0.22);
   }
 
-  /* Avatar */
-  .nb-avatar-wrap {
-    display: flex;
-    align-items: center;
+  .nb-profile-link {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--nb-border);
+    border-radius: 12px;
+    background: var(--nb-surface);
     text-decoration: none;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
   }
+
+  .nb-profile-link:hover,
+  .nb-profile-link--active {
+    border-color: #c4b5fd;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08);
+  }
+
+  .nb-avatar,
+  .nb-avatar-fallback {
+    width: 100%;
+    height: 100%;
+  }
+
   .nb-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
+    display: block;
     object-fit: cover;
-    transition: border-color 0.15s, transform 0.15s;
-  }
-  .nb-avatar-wrap:hover .nb-avatar {
-    border-color: var(--violet-mid);
-    transform: scale(1.05);
   }
 
-  /* Logout */
-  .nb-logout {
-    background: none;
-    border: none;
-    cursor: pointer;
+  .nb-avatar-fallback {
+    display: grid;
+    place-items: center;
+    background: var(--nb-violet-light);
+    color: var(--nb-violet);
     font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-    padding: 7px 10px;
-    border-radius: 8px;
-    transition: color 0.15s, background 0.15s;
-  }
-  .nb-logout:hover {
-    color: var(--red);
-    background: #FEF2F2;
+    font-weight: 750;
   }
 
-  /* ── Hamburger ── */
-  .nb-hamburger {
-    background: none;
+  .nb-logout-button {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
     border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--nb-faint);
     cursor: pointer;
-    color: var(--indigo);
-    padding: 6px;
-    border-radius: 8px;
-    margin-left: auto;
+    transition:
+      background 150ms ease,
+      color 150ms ease;
+  }
+
+  .nb-logout-button:hover {
+    background: var(--nb-red-light);
+    color: var(--nb-red);
+  }
+
+  .nb-logout-button:disabled,
+  .nb-mobile-logout:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .nb-menu-button {
     display: none;
-    transition: background 0.15s;
-  }
-  .nb-hamburger:hover { background: var(--violet-lt); color: var(--violet); }
-
-  /* ── Mobile menu ── */
-  .nb-mobile {
-    max-width: 1100px;
-    margin: 8px auto 0;
-    background: rgba(255,255,255,0.96);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: 0 8px 32px rgba(27,27,58,0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .nb-mobile-user {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 4px 4px 12px;
-  }
-  .nb-mobile-avatar {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
+    margin-left: auto;
+    place-items: center;
+    border: 1px solid var(--nb-border);
+    border-radius: 11px;
+    background: var(--nb-surface);
+    color: var(--nb-indigo);
+    cursor: pointer;
+  }
+
+  .nb-mobile-menu {
+    width: min(1160px, calc(100% - 32px));
+    margin: 0 auto 12px;
+    padding: 16px;
+    border: 1px solid var(--nb-border);
+    border-radius: 17px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 20px 50px rgba(27, 27, 58, 0.12);
+    animation: nb-menu-enter 180ms ease-out both;
+  }
+
+  .nb-mobile-profile {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+
+  .nb-mobile-avatar-wrap {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--nb-border);
+    border-radius: 13px;
+  }
+
+  .nb-mobile-avatar,
+  .nb-mobile-avatar-fallback {
+    width: 100%;
+    height: 100%;
+  }
+
+  .nb-mobile-avatar {
+    display: block;
     object-fit: cover;
   }
+
+  .nb-mobile-avatar-fallback {
+    display: grid;
+    place-items: center;
+    background: var(--nb-violet-light);
+    color: var(--nb-violet);
+    font-size: 14px;
+    font-weight: 750;
+  }
+
+  .nb-mobile-profile-copy {
+    min-width: 0;
+    flex: 1;
+  }
+
   .nb-mobile-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--indigo);
+    overflow: hidden;
     margin: 0;
+    color: var(--nb-indigo);
+    font-size: 14px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nb-mobile-university {
+    overflow: hidden;
+    margin: 3px 0 0;
+    color: var(--nb-faint);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nb-mobile-profile-link {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--nb-violet-light);
+    color: var(--nb-violet);
   }
 
   .nb-mobile-divider {
     height: 1px;
-    background: var(--border);
-    margin: 8px 0;
+    margin: 14px 0;
+    background: var(--nb-border);
+  }
+
+  .nb-mobile-links,
+  .nb-mobile-actions {
+    display: grid;
+    gap: 5px;
   }
 
   .nb-mobile-link {
     display: flex;
+    min-height: 43px;
     align-items: center;
     gap: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
+    padding: 0 12px;
+    border-radius: 11px;
+    color: var(--nb-muted);
+    font-size: 13px;
+    font-weight: 600;
     text-decoration: none;
-    padding: 10px 12px;
-    border-radius: 10px;
-    transition: color 0.15s, background 0.15s;
   }
-  .nb-mobile-link:hover {
-    color: var(--violet);
-    background: var(--violet-lt);
-  }
-  .nb-mobile-link-icon { font-size: 16px; }
 
-  .nb-mobile-btn {
+  .nb-mobile-link span:nth-child(2) {
+    flex: 1;
+  }
+
+  .nb-mobile-link:hover,
+  .nb-mobile-link--active {
+    background: var(--nb-violet-light);
+    color: var(--nb-violet);
+  }
+
+  .nb-mobile-action,
+  .nb-mobile-logout {
     display: flex;
+    min-height: 45px;
+    width: 100%;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    padding: 11px;
-    border-radius: 12px;
+    border-radius: 11px;
+    font-size: 13px;
+    font-weight: 680;
     text-decoration: none;
-    transition: background 0.15s;
-    margin-top: 4px;
   }
-  .nb-mobile-btn--live {
-    color: var(--green);
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
+
+  .nb-mobile-action--live {
+    border: 1px solid #a7f3d0;
+    background: var(--nb-green-light);
+    color: #047857;
   }
-  .nb-mobile-btn--live:hover { background: #D1FAE5; }
-  .nb-mobile-btn--create {
-    color: #fff;
-    background: var(--violet);
+
+  .nb-mobile-action--live-active {
+    box-shadow: inset 3px 0 0 var(--nb-green);
   }
-  .nb-mobile-btn--create:hover { background: #6D28D9; }
+
+  .nb-mobile-action--create {
+    border: 1px solid var(--nb-violet);
+    background: var(--nb-violet);
+    color: white;
+  }
 
   .nb-mobile-logout {
-    background: none;
-    border: 1px solid var(--border);
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--red);
-    padding: 10px;
-    border-radius: 12px;
     margin-top: 4px;
-    transition: background 0.15s, border-color 0.15s;
-    width: 100%;
-  }
-  .nb-mobile-logout:hover {
-    background: #FEF2F2;
-    border-color: #FECACA;
+    border: 1px solid #fecaca;
+    background: white;
+    color: var(--nb-red);
+    cursor: pointer;
   }
 
-  /* ── Responsive ── */
-  @media (max-width: 768px) {
-    .nb-links, .nb-right { display: none; }
-    .nb-hamburger { display: flex; }
+  .nb-mobile-guest {
+    display: grid;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .nb-mobile-guest p {
+    margin: 0;
+    color: var(--nb-muted);
+    font-size: 13px;
+  }
+
+  .nb-link:focus-visible,
+  .nb-brand:focus-visible,
+  .nb-live-button:focus-visible,
+  .nb-create-button:focus-visible,
+  .nb-login-button:focus-visible,
+  .nb-profile-link:focus-visible,
+  .nb-logout-button:focus-visible,
+  .nb-menu-button:focus-visible,
+  .nb-mobile-link:focus-visible,
+  .nb-mobile-action:focus-visible,
+  .nb-mobile-logout:focus-visible {
+    outline: 3px solid rgba(124, 58, 237, 0.22);
+    outline-offset: 2px;
+  }
+
+  @keyframes nb-menu-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 860px) {
+    .nb-desktop-links,
+    .nb-desktop-actions {
+      display: none;
+    }
+
+    .nb-menu-button {
+      display: grid;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .nb-nav {
+      width: calc(100% - 28px);
+      min-height: 64px;
+    }
+
+    .nb-brand-name {
+      font-size: 15px;
+    }
+
+    .nb-brand-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+    }
+
+    .nb-mobile-menu {
+      width: calc(100% - 24px);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .nb-live-dot::after { animation: none; }
-    .nb-btn-create:hover { transform: none; }
+    .nb-mobile-menu {
+      animation: none;
+    }
+
+    .nb-link,
+    .nb-live-button,
+    .nb-create-button,
+    .nb-login-button,
+    .nb-profile-link,
+    .nb-logout-button {
+      transition: none;
+    }
+
+    .nb-create-button:hover,
+    .nb-login-button:hover {
+      transform: none;
+    }
   }
-  
-  .nb-link-buddies {
-  position: relative;
-}
-
-.nb-notification {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  min-width: 16px;
-  height: 16px;
-
-  padding: 0 4px;
-
-  border-radius: 999px;
-
-  background: #EF4444;
-  color: white;
-
-  font-size: 10px;
-  font-weight: 700;
-
-  line-height: 1;
-}
-
-.nb-buddies-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-@keyframes nb-badge-pulse {
-  0%,100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.08);
-  }
-}
 `;

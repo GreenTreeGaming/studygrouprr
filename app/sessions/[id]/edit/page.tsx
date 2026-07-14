@@ -14,6 +14,11 @@ import {
 } from "@/lib/contentModeration";
 
 import {
+  normalizeCourseCode,
+  isValidCourseCode,
+} from "@/lib/courseValidation";
+
+import {
   BookOpen,
   MapPin,
   CalendarDays,
@@ -75,16 +80,6 @@ export default function EditSessionPage() {
     setAlertOpen(true);
   }
 
-  function normalizeCourseCode(input: string) {
-    return input
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "");
-  }
-
-  const COURSE_CODE_REGEX =
-      /^[A-Z]{2,5}\d{3,4}$/;
-
   useEffect(() => {
     loadSession();
   }, [id]);
@@ -122,10 +117,10 @@ export default function EditSessionPage() {
     }
 
     const { data, error } = await supabase
-      .from("study_sessions")
-      .select("*")
-      .eq("id", id)
-      .single();
+        .from("study_sessions")
+        .select("*")
+        .eq("id", id)
+        .single();
 
     if (error || !data) {
       router.push("/sessions");
@@ -145,8 +140,8 @@ export default function EditSessionPage() {
     const formatForInput = (dateString: string) => {
       const date = new Date(dateString);
       return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+          .toISOString()
+          .slice(0, 16);
     };
 
     setTitle(data.title);
@@ -171,7 +166,7 @@ export default function EditSessionPage() {
 
   if (
       normalizedCourseCode &&
-      !COURSE_CODE_REGEX.test(
+      !isValidCourseCode(
           normalizedCourseCode
       )
   ) {
@@ -188,111 +183,111 @@ export default function EditSessionPage() {
   ].join(" ");
 
   const linkRegex =
-    /(https?:\/\/|www\.)/i;
+      /(https?:\/\/|www\.)/i;
 
   const phoneRegex =
-    /(\+?1)?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
+      /(\+?1)?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
 
   const socialRegex =
-    /(instagram|snapchat|discord|telegram|tiktok|@)/i;
+      /(instagram|snapchat|discord|telegram|tiktok|@)/i;
 
   if (phoneRegex.test(combinedText)) {
     validationErrors.push(
-      "Phone numbers are not allowed."
+        "Phone numbers are not allowed."
     );
   }
 
   if (socialRegex.test(combinedText)) {
     validationErrors.push(
-      "Social media handles are not allowed."
+        "Social media handles are not allowed."
     );
   }
 
   if (linkRegex.test(combinedText)) {
     validationErrors.push(
-      "Links are not allowed."
+        "Links are not allowed."
     );
   }
 
   if (
-    containsInappropriateContent(combinedText)
+      containsInappropriateContent(combinedText)
   ) {
     validationErrors.push(
-      "Please remove inappropriate language."
+        "Please remove inappropriate language."
     );
   }
 
   if (
-    location.trim() &&
-    location.trim().length < 10
+      location.trim() &&
+      location.trim().length < 10
   ) {
     validationErrors.push(
-      "Location should be more specific."
+        "Location should be more specific."
     );
   }
 
   if (
-    identification.trim() &&
-    identification.trim().length < 10
+      identification.trim() &&
+      identification.trim().length < 10
   ) {
     validationErrors.push(
-      "Describe how students can find you."
+        "Describe how students can find you."
     );
   }
 
   if (
-    description.trim().length < 10
+      description.trim().length < 10
   ) {
     validationErrors.push(
-      "Description should be at least 10 characters."
+        "Description should be at least 10 characters."
     );
   }
 
   if (
-    startTime &&
-    new Date(startTime) < new Date()
+      startTime &&
+      new Date(startTime) < new Date()
   ) {
     validationErrors.push(
-      "Start time cannot be in the past."
+        "Start time cannot be in the past."
     );
   }
 
   if (
-    startTime &&
-    endTime &&
-    new Date(endTime) <= new Date(startTime)
+      startTime &&
+      endTime &&
+      new Date(endTime) <= new Date(startTime)
   ) {
     validationErrors.push(
-      "End time must be after start time."
+        "End time must be after start time."
     );
   }
 
   const durationHours =
-    startTime && endTime
-      ? (
-        new Date(endTime).getTime() -
-        new Date(startTime).getTime()
-      ) /
-      1000 /
-      60 /
-      60
-      : 0;
+      startTime && endTime
+          ? (
+              new Date(endTime).getTime() -
+              new Date(startTime).getTime()
+          ) /
+          1000 /
+          60 /
+          60
+          : 0;
 
   if (durationHours > 6) {
     validationErrors.push(
-      "Sessions cannot exceed 6 hours."
+        "Sessions cannot exceed 6 hours."
     );
   }
 
   const canSave =
-    title.trim() &&
-    courseCode.trim() &&
-    location.trim() &&
-    identification.trim() &&
-    description.trim() &&
-    startTime &&
-    endTime &&
-    validationErrors.length === 0;
+      title.trim() &&
+      courseCode.trim() &&
+      location.trim() &&
+      identification.trim() &&
+      description.trim() &&
+      startTime &&
+      endTime &&
+      validationErrors.length === 0;
 
   async function saveSession() {
     if (validationErrors.length > 0) {
@@ -300,12 +295,12 @@ export default function EditSessionPage() {
     }
 
     if (
-      !title ||
-      !courseCode ||
-      !location ||
-      !identification ||
-      !startTime ||
-      !endTime
+        !title ||
+        !courseCode ||
+        !location ||
+        !identification ||
+        !startTime ||
+        !endTime
     ) {
       showAlert(
           "Missing Information",
@@ -319,7 +314,7 @@ export default function EditSessionPage() {
         normalizeCourseCode(courseCode);
 
     if (
-        !COURSE_CODE_REGEX.test(
+        !isValidCourseCode(
             normalizedCourseCode
         )
     ) {
@@ -343,17 +338,17 @@ export default function EditSessionPage() {
     setSaving(true);
 
     const { error } = await supabase
-      .from("study_sessions")
-      .update({
-        title,
-        course_code: normalizedCourseCode,
-        location_name: location,
-        description,
-        identification,
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString(),
-      })
-      .eq("id", id);
+        .from("study_sessions")
+        .update({
+          title,
+          course_code: normalizedCourseCode,
+          location_name: location,
+          description,
+          identification,
+          start_time: new Date(startTime).toISOString(),
+          end_time: new Date(endTime).toISOString(),
+        })
+        .eq("id", id);
 
     setSaving(false);
 
@@ -389,330 +384,330 @@ export default function EditSessionPage() {
 
   if (loading || pageLoading) {
     return (
-      <>
-        <style>{esStyles}</style>
-        <main className="es-loading-screen">
-          <div className="es-loading-spinner" />
-          <p className="es-loading-text">Loading session…</p>
-        </main>
-      </>
+        <>
+          <style>{esStyles}</style>
+          <main className="es-loading-screen">
+            <div className="es-loading-spinner" />
+            <p className="es-loading-text">Loading session…</p>
+          </main>
+        </>
     );
   }
 
   if (!profile) {
     return (
-      <>
-        <style>{esStyles}</style>
-        <main className="es-loading-screen">
-          <p className="es-loading-text">No profile found.</p>
-        </main>
-      </>
+        <>
+          <style>{esStyles}</style>
+          <main className="es-loading-screen">
+            <p className="es-loading-text">No profile found.</p>
+          </main>
+        </>
     );
   }
 
   return (
-    <>
-      <style>{esStyles}</style>
-      <main className="es-root">
-        {/* Hero */}
-        <header className="es-hero-bar">
-          <div className="es-hero-inner">
-            <p className="es-hero-eyebrow">Edit session</p>
-            <h1 className="es-hero-title">{title || "Edit study session"}</h1>
-            <p className="es-hero-subtitle">Update your session details below.</p>
-          </div>
-        </header>
+      <>
+        <style>{esStyles}</style>
+        <main className="es-root">
+          {/* Hero */}
+          <header className="es-hero-bar">
+            <div className="es-hero-inner">
+              <p className="es-hero-eyebrow">Edit session</p>
+              <h1 className="es-hero-title">{title || "Edit study session"}</h1>
+              <p className="es-hero-subtitle">Update your session details below.</p>
+            </div>
+          </header>
 
-        <div className="es-page-body">
-          <button onClick={() => router.push(`/sessions/${id}`)} className="es-back-btn">
-            <ArrowLeft size={16} />
-            Back to session
-          </button>
+          <div className="es-page-body">
+            <button onClick={() => router.push(`/sessions/${id}`)} className="es-back-btn">
+              <ArrowLeft size={16} />
+              Back to session
+            </button>
 
-          <div className="es-two-col">
-            {/* Form */}
-            <section ref={cardRef} className="es-card es-card--form">
-              <div className="es-uni-banner es-item">
-                <GraduationCap size={16} className="es-uni-icon" />
-                <div>
-                  <p className="es-uni-label">University</p>
-                  <p className="es-uni-value">{profile.university}</p>
-                </div>
-              </div>
-
-              <div className="es-field es-item">
-                <label className="es-label">
-                  <BookOpen size={14} className="es-label-icon" />
-                  Session title
-                </label>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="es-input"
-                />
-              </div>
-
-              <div className="es-field es-item">
-                <label className="es-label">
-                  <BookOpen size={14} className="es-label-icon" />
-                  Course code
-                </label>
-                <input
-                    value={courseCode}
-                    onChange={(e) =>
-                        setCourseCode(
-                            e.target.value.toUpperCase()
-                        )
-                    }
-                    className="es-input"
-                />
-
-                {courseCode.trim() &&
-                    !COURSE_CODE_REGEX.test(
-                        normalizeCourseCode(courseCode)
-                    ) && (
-                        <p className="es-warning">
-                          Enter a valid course code like CS400,
-                          MATH340, or BIO101.
-                        </p>
-                    )}
-              </div>
-
-              <div className="es-field es-item">
-                <label className="es-label">
-                  <MapPin size={14} className="es-label-icon" />
-                  Location
-                </label>
-
-                <p className="es-hint">
-                  Be as specific as possible — floor, room, table number all help.
-                </p>
-
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="es-input"
-                />
-
-                {location.trim().length > 0 &&
-                  location.trim().length < 10 && (
-                    <p className="es-warning">
-                      Try being more specific. Include a room,
-                      floor, table, or area.
-                    </p>
-                  )}
-
-                {location.trim().length >= 10 && (
-                  <p className="es-success">
-                    Great! That location is specific enough.
-                  </p>
-                )}
-              </div>
-
-              <div className="es-field es-item">
-                <label className="es-label">
-                  <User size={14} className="es-label-icon" />
-                  How to find you
-                </label>
-
-                <p className="es-hint">
-                  Describe what you're wearing or where you're sitting.
-                </p>
-
-                <input
-                  value={identification}
-                  onChange={(e) =>
-                    setIdentification(e.target.value)
-                  }
-                  className="es-input"
-                  placeholder="Blue hoodie, sitting near windows"
-                />
-
-                {identification.trim().length > 0 &&
-                  identification.trim().length < 10 && (
-                    <p className="es-warning">
-                      Students may have trouble finding you.
-                    </p>
-                  )}
-
-                {identification.trim().length >= 10 && (
-                  <p className="es-success">
-                    Great! Other students should be able to find you.
-                  </p>
-                )}
-              </div>
-
-              <div className="es-field-row es-item">
-                <div className="es-field">
-                  <label className="es-label">
-                    <CalendarDays size={14} className="es-label-icon" />
-                    Start time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="es-input"
-                  />
-                </div>
-
-                <div className="es-field">
-                  <label className="es-label">
-                    <CalendarDays size={14} className="es-label-icon" />
-                    End time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="es-input"
-                  />
-                </div>
-              </div>
-
-              <div className="es-field es-item">
-                <label className="es-label">
-                  <FileText size={14} className="es-label-icon" />
-                  Description
-                </label>
-                <textarea
-                  rows={4}
-                  maxLength={500}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="es-textarea"
-                />
-                <p className="es-character-count">
-                  {description.length}/500 characters
-                </p>
-              </div>
-
-              {combinedText.trim().length > 0 &&
-                validationErrors.length > 0 && (
-                  <div className="es-errors">
-                    {validationErrors.map((error) => (
-                      <div
-                        key={error}
-                        className="es-error"
-                      >
-                        {error}
-                      </div>
-                    ))}
+            <div className="es-two-col">
+              {/* Form */}
+              <section ref={cardRef} className="es-card es-card--form">
+                <div className="es-uni-banner es-item">
+                  <GraduationCap size={16} className="es-uni-icon" />
+                  <div>
+                    <p className="es-uni-label">University</p>
+                    <p className="es-uni-value">{profile.university}</p>
                   </div>
-                )}
-
-              <button onClick={saveSession} disabled={saving || !canSave} className="es-submit es-item">
-                {saving ? "Saving changes…" : "Save changes"}
-              </button>
-
-              <button
-                  onClick={() => setDeleteOpen(true)}
-                  className="es-delete es-item"
-              >
-                <Trash2 size={16} />
-                Delete session
-              </button>
-            </section>
-
-            {/* Preview */}
-            <section className="es-card es-card--preview">
-              <div className="es-card-header">
-                <h2 className="es-card-title">Preview</h2>
-              </div>
-
-              <div className="es-preview-session">
-                <div className="es-preview-top">
-                  {courseCode && <span className="es-tag">{courseCode}</span>}
                 </div>
-                <h3 className="es-preview-title">{title || "Session title"}</h3>
 
-                <div className="es-preview-meta">
+                <div className="es-field es-item">
+                  <label className="es-label">
+                    <BookOpen size={14} className="es-label-icon" />
+                    Session title
+                  </label>
+                  <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="es-input"
+                  />
+                </div>
+
+                <div className="es-field es-item">
+                  <label className="es-label">
+                    <BookOpen size={14} className="es-label-icon" />
+                    Course code
+                  </label>
+                  <input
+                      value={courseCode}
+                      onChange={(e) =>
+                          setCourseCode(
+                              e.target.value.toUpperCase()
+                          )
+                      }
+                      className="es-input"
+                  />
+
+                  {courseCode.trim() &&
+                      !isValidCourseCode(
+                          normalizeCourseCode(courseCode)
+                      ) && (
+                          <p className="es-warning">
+                            Enter a valid course code like CS400,
+                            MATH340, or BIO101.
+                          </p>
+                      )}
+                </div>
+
+                <div className="es-field es-item">
+                  <label className="es-label">
+                    <MapPin size={14} className="es-label-icon" />
+                    Location
+                  </label>
+
+                  <p className="es-hint">
+                    Be as specific as possible — floor, room, table number all help.
+                  </p>
+
+                  <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="es-input"
+                  />
+
+                  {location.trim().length > 0 &&
+                      location.trim().length < 10 && (
+                          <p className="es-warning">
+                            Try being more specific. Include a room,
+                            floor, table, or area.
+                          </p>
+                      )}
+
+                  {location.trim().length >= 10 && (
+                      <p className="es-success">
+                        Great! That location is specific enough.
+                      </p>
+                  )}
+                </div>
+
+                <div className="es-field es-item">
+                  <label className="es-label">
+                    <User size={14} className="es-label-icon" />
+                    How to find you
+                  </label>
+
+                  <p className="es-hint">
+                    Describe what you're wearing or where you're sitting.
+                  </p>
+
+                  <input
+                      value={identification}
+                      onChange={(e) =>
+                          setIdentification(e.target.value)
+                      }
+                      className="es-input"
+                      placeholder="Blue hoodie, sitting near windows"
+                  />
+
+                  {identification.trim().length > 0 &&
+                      identification.trim().length < 10 && (
+                          <p className="es-warning">
+                            Students may have trouble finding you.
+                          </p>
+                      )}
+
+                  {identification.trim().length >= 10 && (
+                      <p className="es-success">
+                        Great! Other students should be able to find you.
+                      </p>
+                  )}
+                </div>
+
+                <div className="es-field-row es-item">
+                  <div className="es-field">
+                    <label className="es-label">
+                      <CalendarDays size={14} className="es-label-icon" />
+                      Start time
+                    </label>
+                    <input
+                        type="datetime-local"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="es-input"
+                    />
+                  </div>
+
+                  <div className="es-field">
+                    <label className="es-label">
+                      <CalendarDays size={14} className="es-label-icon" />
+                      End time
+                    </label>
+                    <input
+                        type="datetime-local"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="es-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="es-field es-item">
+                  <label className="es-label">
+                    <FileText size={14} className="es-label-icon" />
+                    Description
+                  </label>
+                  <textarea
+                      rows={4}
+                      maxLength={500}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="es-textarea"
+                  />
+                  <p className="es-character-count">
+                    {description.length}/500 characters
+                  </p>
+                </div>
+
+                {combinedText.trim().length > 0 &&
+                    validationErrors.length > 0 && (
+                        <div className="es-errors">
+                          {validationErrors.map((error) => (
+                              <div
+                                  key={error}
+                                  className="es-error"
+                              >
+                                {error}
+                              </div>
+                          ))}
+                        </div>
+                    )}
+
+                <button onClick={saveSession} disabled={saving || !canSave} className="es-submit es-item">
+                  {saving ? "Saving changes…" : "Save changes"}
+                </button>
+
+                <button
+                    onClick={() => setDeleteOpen(true)}
+                    className="es-delete es-item"
+                >
+                  <Trash2 size={16} />
+                  Delete session
+                </button>
+              </section>
+
+              {/* Preview */}
+              <section className="es-card es-card--preview">
+                <div className="es-card-header">
+                  <h2 className="es-card-title">Preview</h2>
+                </div>
+
+                <div className="es-preview-session">
+                  <div className="es-preview-top">
+                    {courseCode && <span className="es-tag">{courseCode}</span>}
+                  </div>
+                  <h3 className="es-preview-title">{title || "Session title"}</h3>
+
+                  <div className="es-preview-meta">
                   <span className="es-preview-meta-item">
                     <MapPin size={14} />
                     {location || "Location"}
                   </span>
-                  {identification && (
-                    <span className="es-preview-meta-item">
+                    {identification && (
+                        <span className="es-preview-meta-item">
                       <User size={14} />
-                      {identification}
+                          {identification}
                     </span>
-                  )}
-                  <span className="es-preview-meta-item">
+                    )}
+                    <span className="es-preview-meta-item">
                     <CalendarDays size={14} />
-                    {startTime
-                      ? new Date(startTime).toLocaleString([], {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })
-                      : "Start time"}
+                      {startTime
+                          ? new Date(startTime).toLocaleString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                          : "Start time"}
                   </span>
-                  <span className="es-preview-meta-item">
+                    <span className="es-preview-meta-item">
                     Ends{" "}
-                    {endTime
-                      ? new Date(endTime).toLocaleString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })
-                      : "—"}
+                      {endTime
+                          ? new Date(endTime).toLocaleString([], {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                          : "—"}
                   </span>
-                </div>
-
-                {description && (
-                  <div className="es-preview-description">
-                    <p>{description}</p>
                   </div>
-                )}
 
-                <div className="es-preview-creator">
-                  <p className="es-preview-creator-name">Created by {profile.name}</p>
-                  <p className="es-preview-creator-uni">{profile.university}</p>
+                  {description && (
+                      <div className="es-preview-description">
+                        <p>{description}</p>
+                      </div>
+                  )}
+
+                  <div className="es-preview-creator">
+                    <p className="es-preview-creator-name">Created by {profile.name}</p>
+                    <p className="es-preview-creator-uni">{profile.university}</p>
+                  </div>
                 </div>
-              </div>
-            </section>
-          </div>
-        </div>
-      </main>
-      {deleteOpen && (
-          <div className="es-modal-backdrop">
-            <div className="es-modal">
-              <h3>Delete Session?</h3>
-
-              <p>
-                This will permanently delete this study
-                session and remove all attendees.
-              </p>
-
-              <div className="es-modal-actions">
-                <button
-                    onClick={() => setDeleteOpen(false)}
-                    className="es-modal-cancel"
-                >
-                  Cancel
-                </button>
-
-                <button
-                    onClick={async () => {
-                      setDeleteOpen(false);
-                      await deleteSession();
-                    }}
-                    className="es-modal-delete"
-                >
-                  Delete Session
-                </button>
-              </div>
+              </section>
             </div>
           </div>
-      )}
-      <AlertModal
-          open={alertOpen}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          type={alertConfig.type}
-          onClose={() => setAlertOpen(false)}
-      />
-    </>
+        </main>
+        {deleteOpen && (
+            <div className="es-modal-backdrop">
+              <div className="es-modal">
+                <h3>Delete Session?</h3>
+
+                <p>
+                  This will permanently delete this study
+                  session and remove all attendees.
+                </p>
+
+                <div className="es-modal-actions">
+                  <button
+                      onClick={() => setDeleteOpen(false)}
+                      className="es-modal-cancel"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                      onClick={async () => {
+                        setDeleteOpen(false);
+                        await deleteSession();
+                      }}
+                      className="es-modal-delete"
+                  >
+                    Delete Session
+                  </button>
+                </div>
+              </div>
+            </div>
+        )}
+        <AlertModal
+            open={alertOpen}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            type={alertConfig.type}
+            onClose={() => setAlertOpen(false)}
+        />
+      </>
   );
 }
 

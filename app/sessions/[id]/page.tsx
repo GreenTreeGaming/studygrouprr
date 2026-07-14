@@ -9,7 +9,9 @@ import { useRequireOnboarding } from "@/hooks/useRequiredOnboarding";
 
 import {
   MapPin,
+  Check,
   CalendarDays,
+  SearchX,
   Users,
   ArrowLeft,
   GraduationCap,
@@ -354,7 +356,9 @@ export default function SessionDetailsPage() {
         <style>{sdStyles}</style>
         <main className="sd-loading-screen">
           <div className="sd-notfound-card">
-            <p className="sd-notfound-emoji">🔍</p>
+            <div className="sd-notfound-icon">
+              <SearchX size={40} />
+            </div>
             <h1 className="sd-notfound-title">Session not found</h1>
             <p className="sd-notfound-sub">This study session doesn't exist or was removed.</p>
             <Link href="/dashboard" className="sd-notfound-cta">
@@ -451,7 +455,9 @@ export default function SessionDetailsPage() {
 
                 {attendees.length === 0 ? (
                   <div className="sd-empty-state">
-                    <div className="sd-empty-icon">👥</div>
+                    <div className="sd-empty-icon">
+                      <Users size={36} />
+                    </div>
                     <p className="sd-empty-heading">No attendees yet</p>
                     <p className="sd-empty-sub">Be the first to join this session.</p>
                   </div>
@@ -484,7 +490,7 @@ export default function SessionDetailsPage() {
                                 href="/buddies"
                                 className="sd-buddy-added"
                               >
-                                ✓ Study Buddy
+                                <Check size={14} /> Study Buddy
                               </Link>
                             ) : (
                               <button
@@ -523,7 +529,7 @@ export default function SessionDetailsPage() {
                           href="/buddies"
                           className="sd-buddy-added"
                         >
-                          ✓ Study Buddy
+                          <Check size={14} /> Study Buddy
                         </Link>
                       ) : (
                         <button

@@ -13,6 +13,11 @@ import {
 } from "@/lib/contentModeration";
 
 import {
+  normalizeCourseCode,
+  isValidCourseCode,
+} from "@/lib/courseValidation";
+
+import {
   BookOpen,
   MapPin,
   CalendarDays,
@@ -76,16 +81,6 @@ export default function CreateSessionPage({
     setAlertOpen(true);
   }
 
-  function normalizeCourseCode(input: string) {
-    return input
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "");
-  }
-
-  const COURSE_CODE_REGEX =
-      /^[A-Z]{2,6}-?\d{2,4}$/;
-
   useEffect(() => {
     if (!titleTouched && courseCode.length >= 3) {
       setTitle(`${courseCode} Study Session`);
@@ -95,11 +90,11 @@ export default function CreateSessionPage({
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (
-        title ||
-        courseCode ||
-        location ||
-        description ||
-        identification
+          title ||
+          courseCode ||
+          location ||
+          description ||
+          identification
       ) {
         e.preventDefault();
         e.returnValue = "";
@@ -107,15 +102,15 @@ export default function CreateSessionPage({
     };
 
     window.addEventListener(
-      "beforeunload",
-      handler
+        "beforeunload",
+        handler
     );
 
     return () =>
-      window.removeEventListener(
-        "beforeunload",
-        handler
-      );
+        window.removeEventListener(
+            "beforeunload",
+            handler
+        );
   }, [
     title,
     courseCode,
@@ -140,9 +135,9 @@ export default function CreateSessionPage({
     end.setHours(end.getHours() + 1);
 
     const formatForInput = (date: Date) =>
-      new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+        new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+            .toISOString()
+            .slice(0, 16);
 
     setStartTime(formatForInput(start));
     setEndTime(formatForInput(end));
@@ -153,13 +148,13 @@ export default function CreateSessionPage({
   const endDate = endTime ? new Date(endTime) : null;
 
   const durationMinutes =
-    startDate && endDate
-      ? Math.round(
-        (endDate.getTime() - startDate.getTime()) /
-        1000 /
-        60
-      )
-      : 0;
+      startDate && endDate
+          ? Math.round(
+              (endDate.getTime() - startDate.getTime()) /
+              1000 /
+              60
+          )
+          : 0;
 
   const durationHours = durationMinutes / 60;
 
@@ -167,11 +162,11 @@ export default function CreateSessionPage({
   const minutes = durationMinutes % 60;
 
   const durationText =
-    durationMinutes > 0
-      ? hours > 0
-        ? `${hours}h ${minutes}m`
-        : `${minutes}m`
-      : "";
+      durationMinutes > 0
+          ? hours > 0
+              ? `${hours}h ${minutes}m`
+              : `${minutes}m`
+          : "";
 
   const validationErrors: string[] = [];
 
@@ -183,35 +178,35 @@ export default function CreateSessionPage({
   ].join(" ");
 
   const linkRegex =
-    /(https?:\/\/|www\.)/i;
+      /(https?:\/\/|www\.)/i;
 
   const phoneRegex =
-    /(\+?1)?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
+      /(\+?1)?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
 
   if (phoneRegex.test(combinedText)) {
     validationErrors.push(
-      "Phone numbers are not allowed."
+        "Phone numbers are not allowed."
     );
   }
   const socialRegex =
-    /(instagram|snapchat|discord|telegram|tiktok|@)/i;
+      /(instagram|snapchat|discord|telegram|tiktok|@)/i;
 
   if (socialRegex.test(combinedText)) {
     validationErrors.push(
-      "Social media handles are not allowed."
+        "Social media handles are not allowed."
     );
   }
   if (linkRegex.test(combinedText)) {
     validationErrors.push(
-      "Links are not allowed."
+        "Links are not allowed."
     );
   }
 
   if (
-    containsInappropriateContent(combinedText)
+      containsInappropriateContent(combinedText)
   ) {
     validationErrors.push(
-      "Please remove inappropriate language."
+        "Please remove inappropriate language."
     );
   }
 
@@ -220,7 +215,7 @@ export default function CreateSessionPage({
 
   if (
       normalizedCourseCode &&
-      !COURSE_CODE_REGEX.test(
+      !isValidCourseCode(
           normalizedCourseCode
       )
   ) {
@@ -231,62 +226,62 @@ export default function CreateSessionPage({
 
   if (location.trim() && location.trim().length < 10) {
     validationErrors.push(
-      "Location should be more specific."
+        "Location should be more specific."
     );
   }
 
   if (
-    identification.trim() &&
-    identification.trim().length < 5
+      identification.trim() &&
+      identification.trim().length < 5
   ) {
     validationErrors.push(
-      "Describe how students can find you."
+        "Describe how students can find you."
     );
   }
 
   if (description.trim().length < 10) {
     validationErrors.push(
-      "Description should be at least 10 characters."
+        "Description should be at least 10 characters."
     );
   }
 
   if (
-    startDate &&
-    startDate < new Date()
+      startDate &&
+      startDate < new Date()
   ) {
     validationErrors.push(
-      "Start time cannot be in the past."
+        "Start time cannot be in the past."
     );
   }
 
   if (
-    startDate &&
-    endDate &&
-    endDate <= startDate
+      startDate &&
+      endDate &&
+      endDate <= startDate
   ) {
     validationErrors.push(
-      "End time must be after start time."
+        "End time must be after start time."
     );
   }
 
   if (
-    startDate &&
-    endDate &&
-    durationHours > 6
+      startDate &&
+      endDate &&
+      durationHours > 6
   ) {
     validationErrors.push(
-      "Sessions cannot exceed 6 hours."
+        "Sessions cannot exceed 6 hours."
     );
   }
 
   const canCreate =
-    title.trim() &&
-    courseCode.trim() &&
-    location.trim() &&
-    identification.trim() &&
-    startTime &&
-    endTime &&
-    validationErrors.length === 0;
+      title.trim() &&
+      courseCode.trim() &&
+      location.trim() &&
+      identification.trim() &&
+      startTime &&
+      endTime &&
+      validationErrors.length === 0;
 
 
 
@@ -338,7 +333,7 @@ export default function CreateSessionPage({
     }
 
     if (
-        !COURSE_CODE_REGEX.test(
+        !isValidCourseCode(
             normalizedCourseCode
         )
     ) {
@@ -360,11 +355,11 @@ export default function CreateSessionPage({
     }
 
     const durationHours =
-      (new Date(endTime).getTime() -
-        new Date(startTime).getTime()) /
-      1000 /
-      60 /
-      60;
+        (new Date(endTime).getTime() -
+            new Date(startTime).getTime()) /
+        1000 /
+        60 /
+        60;
 
     if (durationHours > 6) {
       showAlert(
@@ -381,19 +376,19 @@ export default function CreateSessionPage({
     if (!user) { router.push("/"); return; }
 
     const { data, error } = await supabase
-      .from("study_sessions")
-      .insert({
-        title,
-        course_code: normalizedCourseCode,
-        location_name: location,
-        description,
-        identification,
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString(),
-        creator_id: user.id,
-      })
-      .select()
-      .single();
+        .from("study_sessions")
+        .insert({
+          title,
+          course_code: normalizedCourseCode,
+          location_name: location,
+          description,
+          identification,
+          start_time: new Date(startTime).toISOString(),
+          end_time: new Date(endTime).toISOString(),
+          creator_id: user.id,
+        })
+        .select()
+        .single();
 
     setCreating(false);
 
@@ -434,359 +429,359 @@ export default function CreateSessionPage({
 
   if (loading) {
     return (
-      <>
-        <style>{csStyles}</style>
-        <main className="cs-root">
-          <div className="cs-loading-screen">
-            <div className="cs-loading-spinner" />
-            <p className="cs-loading-text">Loading…</p>
-          </div>
-        </main>
-      </>
+        <>
+          <style>{csStyles}</style>
+          <main className="cs-root">
+            <div className="cs-loading-screen">
+              <div className="cs-loading-spinner" />
+              <p className="cs-loading-text">Loading…</p>
+            </div>
+          </main>
+        </>
     );
   }
 
   if (!profile) {
     return (
-      <>
-        <style>{csStyles}</style>
-        <main className="cs-root">
-          <div className="cs-loading-screen">
-            <p className="cs-loading-text">No profile found.</p>
-          </div>
-        </main>
-      </>
+        <>
+          <style>{csStyles}</style>
+          <main className="cs-root">
+            <div className="cs-loading-screen">
+              <p className="cs-loading-text">No profile found.</p>
+            </div>
+          </main>
+        </>
     );
   }
 
   return (
-    <>
-      <style>{csStyles}</style>
-      <main className="cs-root">
+      <>
+        <style>{csStyles}</style>
+        <main className="cs-root">
 
-        {/* ── Hero Bar ── */}
-        <header className="cs-hero">
-          <div className="cs-hero-inner">
-            <div className="cs-hero-left">
-              {profile.avatar_url && (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.name}
-                  className="cs-avatar"
-                />
-              )}
-              <div>
-                <p className="cs-eyebrow">New session</p>
-                <h1 className="cs-hero-name">Create a session</h1>
-                <p className="cs-hero-meta">
-                  {profile.university && <span>{profile.university}</span>}
-                  {profile.major && <><span className="cs-dot-sep">·</span><span>{profile.major}</span></>}
-                  {profile.year && <><span className="cs-dot-sep">·</span><span>{profile.year}</span></>}
-                </p>
+          {/* ── Hero Bar ── */}
+          <header className="cs-hero">
+            <div className="cs-hero-inner">
+              <div className="cs-hero-left">
+                {profile.avatar_url && (
+                    <img
+                        src={profile.avatar_url}
+                        alt={profile.name}
+                        className="cs-avatar"
+                    />
+                )}
+                <div>
+                  <p className="cs-eyebrow">New session</p>
+                  <h1 className="cs-hero-name">Create a session</h1>
+                  <p className="cs-hero-meta">
+                    {profile.university && <span>{profile.university}</span>}
+                    {profile.major && <><span className="cs-dot-sep">·</span><span>{profile.major}</span></>}
+                    {profile.year && <><span className="cs-dot-sep">·</span><span>{profile.year}</span></>}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* ── Page Body ── */}
-        <div className="cs-body">
+          {/* ── Page Body ── */}
+          <div className="cs-body">
 
-          <button type="button" onClick={() => router.back()} className="cs-back-btn">
-            <ArrowLeft size={16} />
-            Back
-          </button>
+            <button type="button" onClick={() => router.back()} className="cs-back-btn">
+              <ArrowLeft size={16} />
+              Back
+            </button>
 
-          <div className="cs-layout">
+            <div className="cs-layout">
 
-            {/* ── Main form card ── */}
-            <section className="cs-card">
+              {/* ── Main form card ── */}
+              <section className="cs-card">
 
-              {/* University (read-only) */}
-              <div className="cs-field cs-field--first">
-                <p className="cs-label">
-                  <GraduationCap size={16} className="cs-label-icon" />
-                  University
-                </p>
-                <p className="cs-university-value">{profile.university}</p>
-                <p className="cs-visibility-note">
-                  Only students at your university can see this session.
-                </p>
-              </div>
-
-              <div className="cs-divider" />
-
-              {/* Session Details */}
-              <p className="cs-section-title">Session details</p>
-
-              <div className="cs-field">
-                <label className="cs-label" htmlFor="cs-title">
-                  <BookOpen size={16} className="cs-label-icon" />
-                  Title
-                </label>
-                <input
-                  id="cs-title"
-                  className="cs-input"
-                  value={title}
-                  onChange={(e) => {
-                    setTitleTouched(true);
-                    setTitle(e.target.value);
-                  }}
-                  placeholder="CS400 Midterm Review"
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="cs-field">
-                <label className="cs-label" htmlFor="cs-course">
-                  <BookOpen size={16} className="cs-label-icon" />
-                  Course code
-                </label>
-                <input
-                  id="cs-course"
-                  className="cs-input"
-                  value={courseCode}
-                  onChange={(e) =>
-                      setCourseCode(
-                          e.target.value.toUpperCase()
-                      )
-                  }
-                  placeholder="CS400"
-                  disabled={!!prefilledCourse}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="cs-divider" />
-
-              {/* Meeting Information */}
-              <p className="cs-section-title">Meeting information</p>
-
-              <div className="cs-field">
-                <label className="cs-label" htmlFor="cs-location">
-                  <MapPin size={16} className="cs-label-icon" />
-                  Location
-                </label>
-
-                <p className="cs-hint">
-                  Be as specific as possible — floor, room, table number all help.
-                </p>
-
-                <input
-                  id="cs-location"
-                  className="cs-input"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Union South Study Room 3"
-                  autoComplete="off"
-                />
-
-                {location.trim().length > 0 &&
-                  location.trim().length < 10 && (
-                    <p className="cs-warning">
-                      Try being more specific. Include a room, floor,
-                      table, or area.
-                    </p>
-                  )}
-                {location.trim().length >= 10 && (
-                  <p className="cs-success">
-                    Great! That location is specific enough.
+                {/* University (read-only) */}
+                <div className="cs-field cs-field--first">
+                  <p className="cs-label">
+                    <GraduationCap size={16} className="cs-label-icon" />
+                    University
                   </p>
-                )}
-              </div>
-
-              <div className="cs-field">
-                <label className="cs-label" htmlFor="cs-identification">
-                  <User size={16} className="cs-label-icon" />
-                  How to find you
-                </label>
-                <p className="cs-hint">Describe what you're wearing or where you're sitting.</p>
-                <input
-                  id="cs-identification"
-                  className="cs-input"
-                  value={identification}
-                  onChange={(e) => setIdentification(e.target.value)}
-                  placeholder="Blue hoodie, sitting near the windows with a MacBook"
-                  autoComplete="off"
-                />
-
-                {identification.trim().length > 0 &&
-                  identification.trim().length < 10 && (
-                    <p className="cs-warning">
-                      Students may have trouble finding you.
-                    </p>
-                  )}
-
-
-                {identification.trim().length >= 10 && (
-
-                  <p className="cs-success">
-
-                    Great! Other students should be able to find you.
-
+                  <p className="cs-university-value">{profile.university}</p>
+                  <p className="cs-visibility-note">
+                    Only students at your university can see this session.
                   </p>
-
-                )}
-              </div>
-
-              <div className="cs-divider" />
-
-              {/* Schedule */}
-              <p className="cs-section-title">Schedule</p>
-
-              <div className="cs-field">
-                <label className="cs-label" htmlFor="cs-start">
-                  <CalendarDays size={16} className="cs-label-icon" />
-                  Start time
-                </label>
-                <input
-                  id="cs-start"
-                  type="datetime-local"
-                  className="cs-input"
-                  value={startTime}
-                  onChange={e => setStartTime(e.target.value)}
-                />
-              </div>
-
-              <div className="cs-field">
-                <label className="cs-label" htmlFor="cs-end">
-                  <CalendarDays size={16} className="cs-label-icon" />
-                  End time
-                </label>
-                <input
-                  id="cs-end"
-                  type="datetime-local"
-                  className="cs-input"
-                  value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
-                />
-              </div>
-
-              <div className="cs-divider" />
-
-              {/* Description */}
-              <p className="cs-section-title">Description</p>
-
-              <div className="cs-field cs-field--last">
-                <label className="cs-label" htmlFor="cs-description">
-                  <FileText size={16} className="cs-label-icon" />
-                  What will you be studying?
-                </label>
-                <textarea
-                  id="cs-description"
-                  className="cs-textarea"
-                  value={description}
-                  maxLength={500}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Reviewing dynamic programming problems, working through past exams…"
-                />
-
-                <p className="cs-character-count">
-                  {description.length}/500 characters
-                </p>
-              </div>
-
-              {combinedText.trim().length > 0 &&
-  validationErrors.length > 0 && (
-                <div className="cs-errors">
-                  {validationErrors.map((error) => (
-                    <div
-                      key={error}
-                      className="cs-error"
-                    >
-                      {error}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button
-                onClick={createSession}
-                disabled={creating || !canCreate}
-                className="cs-btn-primary"
-                type="button"
-              >
-                {creating ? "Creating session…" : "Create Session"}
-              </button>
-
-            </section>
-
-            {/* ── Sidebar ── */}
-            <aside className="cs-sidebar">
-
-              {/* Preview Card */}
-              <div className="cs-card cs-preview-card">
-                <div className="cs-card-header">
-                  <h2 className="cs-card-title">Preview</h2>
                 </div>
 
-                <div className="cs-preview-body">
-                  <p className="cs-preview-title">{title || "Session title"}</p>
+                <div className="cs-divider" />
 
-                  <div className="cs-preview-tags">
-                    <span className="cs-tag">{courseCode || "Course code"}</span>
+                {/* Session Details */}
+                <p className="cs-section-title">Session details</p>
+
+                <div className="cs-field">
+                  <label className="cs-label" htmlFor="cs-title">
+                    <BookOpen size={16} className="cs-label-icon" />
+                    Title
+                  </label>
+                  <input
+                      id="cs-title"
+                      className="cs-input"
+                      value={title}
+                      onChange={(e) => {
+                        setTitleTouched(true);
+                        setTitle(e.target.value);
+                      }}
+                      placeholder="CS400 Midterm Review"
+                      autoComplete="off"
+                  />
+                </div>
+
+                <div className="cs-field">
+                  <label className="cs-label" htmlFor="cs-course">
+                    <BookOpen size={16} className="cs-label-icon" />
+                    Course code
+                  </label>
+                  <input
+                      id="cs-course"
+                      className="cs-input"
+                      value={courseCode}
+                      onChange={(e) =>
+                          setCourseCode(
+                              e.target.value.toUpperCase()
+                          )
+                      }
+                      placeholder="CS400"
+                      disabled={!!prefilledCourse}
+                      autoComplete="off"
+                  />
+                </div>
+
+                <div className="cs-divider" />
+
+                {/* Meeting Information */}
+                <p className="cs-section-title">Meeting information</p>
+
+                <div className="cs-field">
+                  <label className="cs-label" htmlFor="cs-location">
+                    <MapPin size={16} className="cs-label-icon" />
+                    Location
+                  </label>
+
+                  <p className="cs-hint">
+                    Be as specific as possible — floor, room, table number all help.
+                  </p>
+
+                  <input
+                      id="cs-location"
+                      className="cs-input"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="Union South Study Room 3"
+                      autoComplete="off"
+                  />
+
+                  {location.trim().length > 0 &&
+                      location.trim().length < 10 && (
+                          <p className="cs-warning">
+                            Try being more specific. Include a room, floor,
+                            table, or area.
+                          </p>
+                      )}
+                  {location.trim().length >= 10 && (
+                      <p className="cs-success">
+                        Great! That location is specific enough.
+                      </p>
+                  )}
+                </div>
+
+                <div className="cs-field">
+                  <label className="cs-label" htmlFor="cs-identification">
+                    <User size={16} className="cs-label-icon" />
+                    How to find you
+                  </label>
+                  <p className="cs-hint">Describe what you're wearing or where you're sitting.</p>
+                  <input
+                      id="cs-identification"
+                      className="cs-input"
+                      value={identification}
+                      onChange={(e) => setIdentification(e.target.value)}
+                      placeholder="Blue hoodie, sitting near the windows with a MacBook"
+                      autoComplete="off"
+                  />
+
+                  {identification.trim().length > 0 &&
+                      identification.trim().length < 10 && (
+                          <p className="cs-warning">
+                            Students may have trouble finding you.
+                          </p>
+                      )}
+
+
+                  {identification.trim().length >= 10 && (
+
+                      <p className="cs-success">
+
+                        Great! Other students should be able to find you.
+
+                      </p>
+
+                  )}
+                </div>
+
+                <div className="cs-divider" />
+
+                {/* Schedule */}
+                <p className="cs-section-title">Schedule</p>
+
+                <div className="cs-field">
+                  <label className="cs-label" htmlFor="cs-start">
+                    <CalendarDays size={16} className="cs-label-icon" />
+                    Start time
+                  </label>
+                  <input
+                      id="cs-start"
+                      type="datetime-local"
+                      className="cs-input"
+                      value={startTime}
+                      onChange={e => setStartTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="cs-field">
+                  <label className="cs-label" htmlFor="cs-end">
+                    <CalendarDays size={16} className="cs-label-icon" />
+                    End time
+                  </label>
+                  <input
+                      id="cs-end"
+                      type="datetime-local"
+                      className="cs-input"
+                      value={endTime}
+                      onChange={e => setEndTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="cs-divider" />
+
+                {/* Description */}
+                <p className="cs-section-title">Description</p>
+
+                <div className="cs-field cs-field--last">
+                  <label className="cs-label" htmlFor="cs-description">
+                    <FileText size={16} className="cs-label-icon" />
+                    What will you be studying?
+                  </label>
+                  <textarea
+                      id="cs-description"
+                      className="cs-textarea"
+                      value={description}
+                      maxLength={500}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={4}
+                      placeholder="Reviewing dynamic programming problems, working through past exams…"
+                  />
+
+                  <p className="cs-character-count">
+                    {description.length}/500 characters
+                  </p>
+                </div>
+
+                {combinedText.trim().length > 0 &&
+                    validationErrors.length > 0 && (
+                        <div className="cs-errors">
+                          {validationErrors.map((error) => (
+                              <div
+                                  key={error}
+                                  className="cs-error"
+                              >
+                                {error}
+                              </div>
+                          ))}
+                        </div>
+                    )}
+
+                <button
+                    onClick={createSession}
+                    disabled={creating || !canCreate}
+                    className="cs-btn-primary"
+                    type="button"
+                >
+                  {creating ? "Creating session…" : "Create Session"}
+                </button>
+
+              </section>
+
+              {/* ── Sidebar ── */}
+              <aside className="cs-sidebar">
+
+                {/* Preview Card */}
+                <div className="cs-card cs-preview-card">
+                  <div className="cs-card-header">
+                    <h2 className="cs-card-title">Preview</h2>
                   </div>
 
-                  {startTime && endTime && (
-                    <div className="cs-duration">
-                      Duration: {durationText}
-                    </div>
-                  )}
+                  <div className="cs-preview-body">
+                    <p className="cs-preview-title">{title || "Session title"}</p>
 
-                  <div className="cs-preview-meta-list">
-                    <div className="cs-preview-meta-row">
-                      <MapPin size={12} className="cs-preview-meta-icon" />
-                      <span>
+                    <div className="cs-preview-tags">
+                      <span className="cs-tag">{courseCode || "Course code"}</span>
+                    </div>
+
+                    {startTime && endTime && (
+                        <div className="cs-duration">
+                          Duration: {durationText}
+                        </div>
+                    )}
+
+                    <div className="cs-preview-meta-list">
+                      <div className="cs-preview-meta-row">
+                        <MapPin size={12} className="cs-preview-meta-icon" />
+                        <span>
                         {location || "Location not added yet"}
                       </span>
-                    </div>
-                    <div className="cs-preview-meta-row">
-                      <CalendarDays size={12} className="cs-preview-meta-icon" />
-                      <span>{startTime ? formatDateTime(startTime) : "Start time"}</span>
-                    </div>
-                    <div className="cs-preview-meta-row">
-                      <CalendarDays size={12} className="cs-preview-meta-icon" />
-                      <span>{endTime ? formatDateTime(endTime) : "End time"}</span>
-                    </div>
-                    {identification && (
-                      <div className="cs-preview-meta-row">
-                        <User size={12} className="cs-preview-meta-icon" />
-                        <span>{identification}</span>
                       </div>
+                      <div className="cs-preview-meta-row">
+                        <CalendarDays size={12} className="cs-preview-meta-icon" />
+                        <span>{startTime ? formatDateTime(startTime) : "Start time"}</span>
+                      </div>
+                      <div className="cs-preview-meta-row">
+                        <CalendarDays size={12} className="cs-preview-meta-icon" />
+                        <span>{endTime ? formatDateTime(endTime) : "End time"}</span>
+                      </div>
+                      {identification && (
+                          <div className="cs-preview-meta-row">
+                            <User size={12} className="cs-preview-meta-icon" />
+                            <span>{identification}</span>
+                          </div>
+                      )}
+                    </div>
+
+                    {description && (
+                        <p className="cs-preview-description">{description}</p>
                     )}
                   </div>
-
-                  {description && (
-                    <p className="cs-preview-description">{description}</p>
-                  )}
                 </div>
-              </div>
 
-              {/* Tips Card */}
-              <div className="cs-card cs-tips-card">
-                <div className="cs-card-header">
-                  <h2 className="cs-card-title">Tips</h2>
+                {/* Tips Card */}
+                <div className="cs-card cs-tips-card">
+                  <div className="cs-card-header">
+                    <h2 className="cs-card-title">Tips</h2>
+                  </div>
+                  <ul className="cs-tips-list">
+                    <li className="cs-tip-row">Be specific about your location — floor, room, and table.</li>
+                    <li className="cs-tip-row">Describe what you're wearing so classmates can find you.</li>
+                    <li className="cs-tip-row">Mention the topics you'll be covering in the description.</li>
+                    <li className="cs-tip-row">Only students at your university can see this session.</li>
+                  </ul>
                 </div>
-                <ul className="cs-tips-list">
-                  <li className="cs-tip-row">Be specific about your location — floor, room, and table.</li>
-                  <li className="cs-tip-row">Describe what you're wearing so classmates can find you.</li>
-                  <li className="cs-tip-row">Mention the topics you'll be covering in the description.</li>
-                  <li className="cs-tip-row">Only students at your university can see this session.</li>
-                </ul>
-              </div>
 
-            </aside>
+              </aside>
+            </div>
           </div>
-        </div>
-      </main>
-      <AlertModal
-          open={alertOpen}
-          title={alertTitle}
-          message={alertMessage}
-          type={alertType}
-          onClose={() => setAlertOpen(false)}
-      />
-    </>
+        </main>
+        <AlertModal
+            open={alertOpen}
+            title={alertTitle}
+            message={alertMessage}
+            type={alertType}
+            onClose={() => setAlertOpen(false)}
+        />
+      </>
   );
 }
 
