@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-
 import {
   BookOpen,
   ChevronRight,
@@ -18,8 +17,9 @@ import {
   X,
 } from "lucide-react";
 
-import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/lib/supabase";
+import Image from "next/image";
 
 const appNavigationItems = [
   {
@@ -57,7 +57,6 @@ const homeNavigationItems = [
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-
   const { profile, loading } = useProfile();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -67,8 +66,6 @@ export default function Navbar() {
 
   const isHomePage = pathname === "/";
   const isLoginPage = pathname === "/login";
-  const isPublicPage = isHomePage || isLoginPage;
-
   const profileInitial =
       profile?.name?.trim().charAt(0).toUpperCase() || "S";
 
@@ -81,6 +78,8 @@ export default function Navbar() {
       return;
     }
 
+    const previousOverflow = document.body.style.overflow;
+
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMobileOpen(false);
@@ -91,7 +90,7 @@ export default function Navbar() {
     window.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleEscape);
     };
   }, [mobileOpen]);
@@ -113,13 +112,13 @@ export default function Navbar() {
               count: "exact",
               head: true,
             })
-            .eq("receiver_id", profile!.id)
+            .eq("receiver_id", profile.id)
             .eq("status", "pending"),
 
         supabase
             .from("live_study_status")
             .select("id")
-            .eq("user_id", profile!.id)
+            .eq("user_id", profile.id)
             .maybeSingle(),
       ]);
 
@@ -130,7 +129,7 @@ export default function Navbar() {
       if (requestsResult.error) {
         console.error(
             "Unable to load pending buddy requests:",
-            requestsResult.error
+            requestsResult.error,
         );
       } else {
         setPendingRequests(requestsResult.count ?? 0);
@@ -139,7 +138,7 @@ export default function Navbar() {
       if (liveResult.error) {
         console.error(
             "Unable to load live study status:",
-            liveResult.error
+            liveResult.error,
         );
       } else {
         setIsLive(Boolean(liveResult.data));
@@ -154,11 +153,11 @@ export default function Navbar() {
 
     window.addEventListener(
         "buddy-requests-changed",
-        refreshNavbarState
+        refreshNavbarState,
     );
     window.addEventListener(
         "live-status-changed",
-        refreshNavbarState
+        refreshNavbarState,
     );
 
     return () => {
@@ -166,11 +165,11 @@ export default function Navbar() {
 
       window.removeEventListener(
           "buddy-requests-changed",
-          refreshNavbarState
+          refreshNavbarState,
       );
       window.removeEventListener(
           "live-status-changed",
-          refreshNavbarState
+          refreshNavbarState,
       );
     };
   }, [profile?.id]);
@@ -210,66 +209,69 @@ export default function Navbar() {
       <>
         <style>{navbarStyles}</style>
 
-        <header
-            className={[
-              "nb3-header",
-              isPublicPage ? "nb3-header--public" : "",
-            ]
-                .filter(Boolean)
-                .join(" ")}
-        >
-          <nav className="nb3-nav" aria-label="Main navigation">
+        <header className="sg-nav-header">
+          <nav className="sg-nav-shell" aria-label="Main navigation">
             <Link
                 href={profile ? "/dashboard" : "/"}
-                className="nb3-brand"
+                className="sg-nav-brand"
                 aria-label="StudyGrouprr home"
             >
-            <span className="nb3-brand-icon" aria-hidden="true">
-              <BookOpen size={18} strokeWidth={2.35} />
-            </span>
+            <span className="sg-nav-brand-mark" aria-hidden="true">
+  <Image
+      src="/navbar-logo.png"
+      alt=""
+      width={40}
+      height={40}
+      priority
+      className="sg-nav-brand-logo"
+  />
+</span>
 
-              <span className="nb3-brand-copy">
-              <span className="nb3-brand-name">StudyGrouprr</span>
+              <span className="sg-nav-brand-copy">
+              <span className="sg-nav-brand-name">
+  <span className="sg-nav-brand-name-primary">Study</span>
+  <span className="sg-nav-brand-name-accent">Grouprr</span>
+</span>
             </span>
             </Link>
 
             {isHomePage && !profile ? (
-                <div className="nb3-desktop-links nb3-desktop-links--public">
+                <div className="sg-nav-public-links">
                   {homeNavigationItems.map((item) => (
                       <a
                           key={item.href}
                           href={item.href}
-                          className="nb3-public-link"
+                          className="sg-nav-public-link"
                       >
                         {item.label}
                       </a>
                   ))}
                 </div>
             ) : profile ? (
-                <div className="nb3-desktop-links">
+                <div className="sg-nav-app-links">
                   {appNavigationItems.map((item) => {
                     const Icon = item.icon;
-                    const activeRoute = isRouteActive(item.href);
+                    const active = isRouteActive(item.href);
 
                     return (
                         <Link
                             key={item.href}
                             href={item.href}
                             className={[
-                              "nb3-link",
-                              activeRoute ? "nb3-link--active" : "",
+                              "sg-nav-app-link",
+                              active ? "sg-nav-app-link--active" : "",
                             ]
                                 .filter(Boolean)
                                 .join(" ")}
-                            aria-current={activeRoute ? "page" : undefined}
+                            aria-current={active ? "page" : undefined}
                         >
-                          <Icon size={15} strokeWidth={2.15} />
+                          <Icon size={15} strokeWidth={2.2} />
                           <span>{item.label}</span>
 
                           {item.href === "/buddies" &&
                               pendingRequests > 0 && (
                                   <span
-                                      className="nb3-notification"
+                                      className="sg-nav-notification"
                                       aria-label={`${pendingRequests} pending buddy ${
                                           pendingRequests === 1
                                               ? "request"
@@ -286,48 +288,47 @@ export default function Navbar() {
                   })}
                 </div>
             ) : (
-                <div className="nb3-desktop-spacer" />
+                <div className="sg-nav-flex-spacer" />
             )}
 
-            <div className="nb3-desktop-actions">
+            <div className="sg-nav-actions">
               {profile ? (
                   <>
                     <Link
                         href="/live"
                         className={[
-                          "nb3-live-button",
-                          isLive ? "nb3-live-button--active" : "",
+                          "sg-nav-live-button",
+                          isLive ? "sg-nav-live-button--active" : "",
                         ]
                             .filter(Boolean)
                             .join(" ")}
                     >
                   <span
                       className={[
-                        "nb3-live-dot",
-                        isLive ? "nb3-live-dot--active" : "",
+                        "sg-nav-live-dot",
+                        isLive ? "sg-nav-live-dot--active" : "",
                       ]
                           .filter(Boolean)
                           .join(" ")}
                       aria-hidden="true"
                   />
-
                       {isLive ? "You’re live" : "Go live"}
                     </Link>
 
                     <Link
                         href="/create-session"
-                        className="nb3-create-button"
+                        className="sg-nav-create-button"
                     >
-                      <Plus size={16} strokeWidth={2.5} />
-                      Create session
+                      <Plus size={16} strokeWidth={2.55} />
+                      <span>Create session</span>
                     </Link>
 
                     <Link
                         href="/profile"
                         className={[
-                          "nb3-profile-link",
+                          "sg-nav-profile",
                           isRouteActive("/profile")
-                              ? "nb3-profile-link--active"
+                              ? "sg-nav-profile--active"
                               : "",
                         ]
                             .filter(Boolean)
@@ -338,22 +339,22 @@ export default function Navbar() {
                           <img
                               src={profile.avatar_url}
                               alt=""
-                              className="nb3-avatar"
+                              className="sg-nav-avatar"
                               referrerPolicy="no-referrer"
                           />
                       ) : (
-                          <span className="nb3-avatar-fallback">
+                          <span className="sg-nav-avatar-fallback">
                       {profileInitial}
                     </span>
                       )}
 
-                      <span className="nb3-profile-indicator" />
+                      <span className="sg-nav-profile-status" />
                     </Link>
 
                     <button
                         type="button"
+                        className="sg-nav-signout"
                         onClick={() => void signOut()}
-                        className="nb3-logout-button"
                         disabled={signingOut}
                         aria-label="Sign out"
                         title="Sign out"
@@ -363,8 +364,8 @@ export default function Navbar() {
                   </>
               ) : (
                   !loading && (
-                      <Link href="/login" className="nb3-login-button">
-                        <span>{isLoginPage ? "Back to sign in" : "Sign in"}</span>
+                      <Link href="/login" className="sg-nav-signin">
+                        <span>{isLoginPage ? "Sign in" : "Sign in"}</span>
                         <LogIn size={16} />
                       </Link>
                   )
@@ -373,10 +374,10 @@ export default function Navbar() {
 
             <button
                 type="button"
-                className="nb3-menu-button"
+                className="sg-nav-menu-button"
                 onClick={() => setMobileOpen((current) => !current)}
                 aria-expanded={mobileOpen}
-                aria-controls="study-grouprr-mobile-menu"
+                aria-controls="studygrouprr-mobile-navigation"
                 aria-label={
                   mobileOpen
                       ? "Close navigation menu"
@@ -391,79 +392,74 @@ export default function Navbar() {
               <>
                 <button
                     type="button"
-                    className="nb3-mobile-backdrop"
+                    className="sg-nav-mobile-backdrop"
                     aria-label="Close navigation menu"
                     onClick={() => setMobileOpen(false)}
                 />
 
                 <div
-                    id="study-grouprr-mobile-menu"
-                    className="nb3-mobile-menu"
+                    id="studygrouprr-mobile-navigation"
+                    className="sg-nav-mobile-panel"
                 >
                   {profile ? (
                       <>
-                        <div className="nb3-mobile-profile">
-                          <div className="nb3-mobile-avatar-wrap">
+                        <div className="sg-nav-mobile-profile">
+                          <div className="sg-nav-mobile-avatar-wrap">
                             {profile.avatar_url ? (
                                 <img
                                     src={profile.avatar_url}
                                     alt=""
-                                    className="nb3-mobile-avatar"
+                                    className="sg-nav-mobile-avatar"
                                     referrerPolicy="no-referrer"
                                 />
                             ) : (
-                                <span className="nb3-mobile-avatar-fallback">
+                                <span className="sg-nav-mobile-avatar-fallback">
                           {profileInitial}
                         </span>
                             )}
                           </div>
 
-                          <div className="nb3-mobile-profile-copy">
-                            <p className="nb3-mobile-name">
-                              {profile.name || "Student"}
-                            </p>
-
-                            <p className="nb3-mobile-university">
-                              {profile.university || "Your campus"}
-                            </p>
+                          <div className="sg-nav-mobile-profile-copy">
+                            <strong>{profile.name || "Student"}</strong>
+                            <span>{profile.university || "Your campus"}</span>
                           </div>
 
                           <Link
                               href="/profile"
-                              className="nb3-mobile-profile-link"
+                              className="sg-nav-mobile-profile-link"
                               aria-label="Open profile"
                           >
                             <User size={17} />
                           </Link>
                         </div>
 
-                        <div className="nb3-mobile-section">
-                          <p className="nb3-mobile-section-label">
+                        <div className="sg-nav-mobile-section">
+                          <p className="sg-nav-mobile-label">
                             Your StudyGrouprr
                           </p>
 
-                          <div className="nb3-mobile-links">
+                          <div className="sg-nav-mobile-links">
                             {appNavigationItems.map((item) => {
                               const Icon = item.icon;
-                              const activeRoute = isRouteActive(item.href);
+                              const active = isRouteActive(item.href);
 
                               return (
                                   <Link
                                       key={item.href}
                                       href={item.href}
                                       className={[
-                                        "nb3-mobile-link",
-                                        activeRoute
-                                            ? "nb3-mobile-link--active"
+                                        "sg-nav-mobile-link",
+                                        active
+                                            ? "sg-nav-mobile-link--active"
                                             : "",
                                       ]
                                           .filter(Boolean)
                                           .join(" ")}
                                       aria-current={
-                                        activeRoute ? "page" : undefined
+                                        active ? "page" : undefined
                                       }
                                   >
-                            <span className="nb3-mobile-link-icon">
+                            <span className="sg-nav-mobile-link-icon">
                               <Icon size={17} />
                             </span>
 
@@ -471,7 +467,7 @@ export default function Navbar() {
 
                                     {item.href === "/buddies" &&
                                     pendingRequests > 0 ? (
-                                        <span className="nb3-mobile-notification">
+                                        <span className="sg-nav-notification">
                                 {pendingRequests > 9
                                     ? "9+"
                                     : pendingRequests}
@@ -479,7 +475,7 @@ export default function Navbar() {
                                     ) : (
                                         <ChevronRight
                                             size={16}
-                                            className="nb3-mobile-chevron"
+                                            className="sg-nav-mobile-chevron"
                                         />
                                     )}
                                   </Link>
@@ -488,14 +484,14 @@ export default function Navbar() {
                           </div>
                         </div>
 
-                        <div className="nb3-mobile-actions">
+                        <div className="sg-nav-mobile-actions">
                           <Link
                               href="/live"
                               className={[
-                                "nb3-mobile-action",
-                                "nb3-mobile-action--live",
+                                "sg-nav-mobile-action",
+                                "sg-nav-mobile-action--live",
                                 isLive
-                                    ? "nb3-mobile-action--live-active"
+                                    ? "sg-nav-mobile-action--live-active"
                                     : "",
                               ]
                                   .filter(Boolean)
@@ -507,7 +503,7 @@ export default function Navbar() {
 
                           <Link
                               href="/create-session"
-                              className="nb3-mobile-action nb3-mobile-action--create"
+                              className="sg-nav-mobile-action sg-nav-mobile-action--create"
                           >
                             <Plus size={17} strokeWidth={2.5} />
                             Create session
@@ -515,67 +511,62 @@ export default function Navbar() {
 
                           <button
                               type="button"
+                              className="sg-nav-mobile-signout"
                               onClick={() => void signOut()}
-                              className="nb3-mobile-logout"
                               disabled={signingOut}
                           >
                             <LogOut size={17} />
-
-                            {signingOut
-                                ? "Signing out…"
-                                : "Sign out"}
+                            {signingOut ? "Signing out…" : "Sign out"}
                           </button>
                         </div>
                       </>
                   ) : (
-                      !loading && (
-                          <>
-                            {isHomePage && (
-                                <div className="nb3-mobile-section">
-                                  <p className="nb3-mobile-section-label">
-                                    Explore
-                                  </p>
+                      <>
+                        {isHomePage && (
+                            <div className="sg-nav-mobile-section">
+                              <p className="sg-nav-mobile-label">
+                                Explore StudyGrouprr
+                              </p>
 
-                                  <div className="nb3-mobile-links">
-                                    {homeNavigationItems.map((item) => (
-                                        <a
-                                            key={item.href}
-                                            href={item.href}
-                                            className="nb3-mobile-link"
-                                        >
-                                          <span>{item.label}</span>
-                                          <ChevronRight
-                                              size={16}
-                                              className="nb3-mobile-chevron"
-                                          />
-                                        </a>
-                                    ))}
-                                  </div>
-                                </div>
-                            )}
-
-                            <div className="nb3-mobile-guest">
-                              <div>
-                                <p className="nb3-mobile-guest-title">
-                                  Find your people on campus.
-                                </p>
-
-                                <p className="nb3-mobile-guest-copy">
-                                  See who is studying your course and join
-                                  them in person.
-                                </p>
+                              <div className="sg-nav-mobile-links">
+                                {homeNavigationItems.map((item) => (
+                                    <a
+                                        key={item.href}
+                                        href={item.href}
+                                        className="sg-nav-mobile-link"
+                                    >
+                                      <span>{item.label}</span>
+                                      <ChevronRight
+                                          size={16}
+                                          className="sg-nav-mobile-chevron"
+                                      />
+                                    </a>
+                                ))}
                               </div>
-
-                              <Link
-                                  href="/login"
-                                  className="nb3-mobile-action nb3-mobile-action--create"
-                              >
-                                Sign in with your university account
-                                <LogIn size={17} />
-                              </Link>
                             </div>
-                          </>
-                      )
+                        )}
+
+                        <div className="sg-nav-mobile-guest">
+                    <span className="sg-nav-mobile-guest-kicker">
+                      Find your people
+                    </span>
+                          <strong>
+                            See who is studying your course on campus.
+                          </strong>
+                          <p>
+                            Join live students or upcoming sessions without
+                            starting another group chat.
+                          </p>
+
+                          <Link
+                              href="/login"
+                              className="sg-nav-mobile-action sg-nav-mobile-action--create"
+                          >
+                            Sign in with your university account
+                            <LogIn size={17} />
+                          </Link>
+                        </div>
+                      </>
                   )}
                 </div>
               </>
@@ -586,45 +577,43 @@ export default function Navbar() {
 }
 
 const navbarStyles = `
-  .nb3-header {
-    --nb3-indigo: #1b1b3a;
-    --nb3-indigo-soft: #29294f;
-    --nb3-violet: #7c3aed;
-    --nb3-violet-dark: #6d28d9;
-    --nb3-violet-soft: #f1edff;
-    --nb3-green: #16a76a;
-    --nb3-green-soft: #eafaf2;
-    --nb3-red: #e5484d;
-    --nb3-red-soft: #fff0f0;
-    --nb3-text: #1b1b3a;
-    --nb3-muted: #6d6b7d;
-    --nb3-faint: #9693a5;
-    --nb3-border: #e5e2ec;
-    --nb3-surface: #fffdfa;
-    --nb3-shell: rgba(250, 249, 252, 0.92);
+  .sg-nav-header {
+    --sg-nav-indigo: #1b1b3a;
+    --sg-nav-indigo-soft: #2a2a50;
+    --sg-nav-violet: #7c3aed;
+    --sg-nav-violet-dark: #6d28d9;
+    --sg-nav-violet-soft: #f1edff;
+    --sg-nav-green: #18a968;
+    --sg-nav-green-soft: #e9f9f1;
+    --sg-nav-red: #e5484d;
+    --sg-nav-red-soft: #fff0f0;
+    --sg-nav-text: #1b1b3a;
+    --sg-nav-muted: #6d6b7d;
+    --sg-nav-faint: #9794a5;
+    --sg-nav-border: #e5e2ec;
+    --sg-nav-surface: #fffdfa;
+    --sg-nav-shell: rgba(250, 249, 252, 0.94);
 
     position: sticky;
     top: 0;
     z-index: 80;
     width: 100%;
-    border-bottom: 1px solid rgba(229, 226, 236, 0.92);
-    background: var(--nb3-shell);
-    box-shadow: 0 1px 0 rgba(27, 27, 58, 0.02);
+    border-bottom: 1px solid rgba(229, 226, 236, 0.9);
+    background: var(--sg-nav-shell);
+    box-shadow:
+      0 1px 0 rgba(27, 27, 58, 0.02),
+      0 8px 28px rgba(27, 27, 58, 0.035);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
   }
 
-  .nb3-header *,
-  .nb3-header *::before,
-  .nb3-header *::after {
+  .sg-nav-header *,
+  .sg-nav-header *::before,
+  .sg-nav-header *::after {
     box-sizing: border-box;
   }
 
-  .nb3-header--public {
-    background: rgba(250, 249, 252, 0.95);
-  }
-
-  .nb3-nav {
+  .sg-nav-shell {
     display: flex;
     width: min(1240px, calc(100% - 48px));
     min-height: 72px;
@@ -633,122 +622,142 @@ const navbarStyles = `
     gap: 22px;
   }
 
-  .nb3-brand {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 11px;
-    color: var(--nb3-text);
-    text-decoration: none;
-  }
+.sg-nav-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--sg-nav-text);
+  text-decoration: none;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
 
-  .nb3-brand-icon {
+.sg-nav-brand:hover {
+  transform: translateY(-1px);
+}
+
+.sg-nav-brand:hover .sg-nav-brand-name-accent {
+  color: var(--sg-nav-violet-dark);
+}
+
+.sg-nav-brand-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+}
+
+.sg-nav-brand-logo {
+  display: block;
+  width: 40px;
+  height: 40px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+  .sg-nav-brand-copy {
     display: grid;
-    width: 38px;
-    height: 38px;
-    place-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 12px;
-    background: var(--nb3-indigo);
-    color: white;
-    box-shadow:
-      0 7px 18px rgba(27, 27, 58, 0.13),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    gap: 3px;
   }
 
-  .nb3-brand-copy {
-    display: grid;
-    gap: 1px;
-  }
+.sg-nav-brand-name {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 16px;
+  font-weight: 780;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  white-space: nowrap;
+}
 
-  .nb3-brand-name {
-    font-size: 15px;
-    font-weight: 780;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-  }
+.sg-nav-brand-name-primary {
+  color: var(--sg-nav-indigo);
+}
 
-  .nb3-brand-status {
+.sg-nav-brand-name-accent {
+  color: var(--sg-nav-violet);
+}
+
+  .sg-nav-brand-subtitle {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    color: var(--nb3-faint);
+    gap: 6px;
+    color: var(--sg-nav-faint);
     font-family: var(--font-mono), monospace;
-    font-size: 8px;
+    font-size: 7.5px;
     font-weight: 700;
     letter-spacing: 0.12em;
     line-height: 1;
     text-transform: uppercase;
   }
 
-  .nb3-brand-status > span {
+  .sg-nav-brand-subtitle > span {
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: var(--nb3-green);
-    box-shadow: 0 0 0 3px rgba(22, 167, 106, 0.1);
+    background: var(--sg-nav-green);
+    box-shadow: 0 0 0 3px rgba(24, 169, 104, 0.1);
   }
 
-  .nb3-desktop-links {
+  .sg-nav-public-links,
+  .sg-nav-app-links {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    margin-left: 18px;
     padding: 4px;
-    border: 1px solid rgba(229, 226, 236, 0.9);
+    border: 1px solid rgba(229, 226, 236, 0.86);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.64);
+    background: rgba(255, 255, 255, 0.65);
   }
 
-  .nb3-desktop-links--public {
-    margin-left: auto;
-  }
-
-  .nb3-desktop-spacer {
-    flex: 1;
-  }
-
-  .nb3-link,
-  .nb3-public-link {
-    position: relative;
+  .sg-nav-public-link,
+  .sg-nav-app-link {
     display: inline-flex;
-    min-height: 38px;
+    min-height: 36px;
     align-items: center;
     justify-content: center;
     gap: 7px;
     padding: 0 13px;
     border-radius: 10px;
-    color: var(--nb3-muted);
+    color: var(--sg-nav-muted);
     font-size: 12px;
     font-weight: 650;
     text-decoration: none;
-    white-space: nowrap;
     transition:
-      background 160ms ease,
-      color 160ms ease,
-      box-shadow 160ms ease,
-      transform 160ms ease;
+      background 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease;
   }
 
-  .nb3-link:hover,
-  .nb3-public-link:hover {
-    background: rgba(255, 255, 255, 0.94);
-    color: var(--nb3-indigo);
-    box-shadow: 0 5px 14px rgba(27, 27, 58, 0.06);
+  .sg-nav-public-link:hover,
+  .sg-nav-app-link:hover {
+    background: white;
+    color: var(--sg-nav-indigo);
+    box-shadow: 0 4px 12px rgba(27, 27, 58, 0.06);
+    transform: translateY(-1px);
   }
 
-  .nb3-link--active {
-    background: var(--nb3-indigo);
+  .sg-nav-app-link--active {
+    background: var(--sg-nav-indigo);
     color: white;
-    box-shadow: 0 6px 15px rgba(27, 27, 58, 0.16);
+    box-shadow: 0 6px 14px rgba(27, 27, 58, 0.14);
   }
 
-  .nb3-link--active:hover {
-    background: var(--nb3-indigo-soft);
+  .sg-nav-app-link--active:hover {
+    background: var(--sg-nav-indigo-soft);
     color: white;
   }
 
-  .nb3-notification,
-  .nb3-mobile-notification {
+  .sg-nav-flex-spacer {
+    flex: 1;
+  }
+
+  .sg-nav-notification {
     display: inline-flex;
     min-width: 18px;
     height: 18px;
@@ -756,295 +765,284 @@ const navbarStyles = `
     justify-content: center;
     padding: 0 5px;
     border-radius: 999px;
-    background: var(--nb3-red);
+    background: var(--sg-nav-red);
     color: white;
     font-size: 9px;
     font-weight: 800;
     line-height: 1;
   }
 
-  .nb3-desktop-actions {
+  .sg-nav-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-left: auto;
   }
 
-  .nb3-live-button,
-  .nb3-create-button,
-  .nb3-login-button {
+  .sg-nav-live-button,
+  .sg-nav-create-button,
+  .sg-nav-signin {
     display: inline-flex;
-    min-height: 42px;
+    min-height: 40px;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    border-radius: 12px;
+    border-radius: 11px;
     font-size: 12px;
     font-weight: 720;
     text-decoration: none;
-    white-space: nowrap;
     transition:
-      background 160ms ease,
-      border-color 160ms ease,
-      color 160ms ease,
-      transform 160ms ease,
-      box-shadow 160ms ease;
+      background 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease;
   }
 
-  .nb3-live-button {
+  .sg-nav-live-button {
     padding: 0 13px;
-    border: 1px solid #ccefdc;
-    background: rgba(234, 250, 242, 0.78);
-    color: #087747;
+    border: 1px solid #cceedd;
+    background: var(--sg-nav-green-soft);
+    color: #087a4a;
   }
 
-  .nb3-live-button:hover,
-  .nb3-live-button--active {
-    border-color: #a6dfbf;
-    background: var(--nb3-green-soft);
+  .sg-nav-live-button:hover,
+  .sg-nav-live-button--active {
+    border-color: #a9e4c7;
+    background: #e1f7ec;
+    transform: translateY(-1px);
   }
 
-  .nb3-live-dot {
+  .sg-nav-live-dot {
     width: 7px;
     height: 7px;
-    border: 1.5px solid var(--nb3-green);
+    border: 1.5px solid currentColor;
     border-radius: 50%;
     background: transparent;
   }
 
-  .nb3-live-dot--active {
-    background: var(--nb3-green);
-    box-shadow: 0 0 0 4px rgba(22, 167, 106, 0.11);
+  .sg-nav-live-dot--active {
+    border-color: var(--sg-nav-green);
+    background: var(--sg-nav-green);
+    box-shadow: 0 0 0 4px rgba(24, 169, 104, 0.1);
   }
 
-  .nb3-create-button {
+  .sg-nav-create-button,
+  .sg-nav-signin {
     padding: 0 15px;
-    background: var(--nb3-violet);
+    background: var(--sg-nav-violet);
     color: white;
-    box-shadow: 0 8px 20px rgba(124, 58, 237, 0.19);
+    box-shadow: 0 8px 18px rgba(124, 58, 237, 0.18);
   }
 
-  .nb3-create-button:hover {
+  .sg-nav-create-button:hover,
+  .sg-nav-signin:hover {
+    background: var(--sg-nav-violet-dark);
+    box-shadow: 0 11px 24px rgba(124, 58, 237, 0.24);
     transform: translateY(-1px);
-    background: var(--nb3-violet-dark);
-    box-shadow: 0 11px 25px rgba(124, 58, 237, 0.24);
   }
 
-  .nb3-login-button {
-    padding: 0 15px;
-    border: 1px solid var(--nb3-indigo);
-    background: var(--nb3-indigo);
-    color: white;
-    box-shadow: 0 8px 20px rgba(27, 27, 58, 0.16);
-  }
-
-  .nb3-login-button:hover {
-    transform: translateY(-1px);
-    background: var(--nb3-indigo-soft);
-    box-shadow: 0 11px 24px rgba(27, 27, 58, 0.2);
-  }
-
-  .nb3-profile-link {
+  .sg-nav-profile {
     position: relative;
     display: grid;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     place-items: center;
     overflow: visible;
-    border: 1px solid var(--nb3-border);
-    border-radius: 13px;
+    border: 1px solid var(--sg-nav-border);
+    border-radius: 12px;
     background: white;
     text-decoration: none;
+    box-shadow: 0 4px 12px rgba(27, 27, 58, 0.05);
     transition:
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      transform 160ms ease;
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease;
   }
 
-  .nb3-profile-link:hover,
-  .nb3-profile-link--active {
-    transform: translateY(-1px);
-    border-color: #c9baf8;
+  .sg-nav-profile:hover,
+  .sg-nav-profile--active {
+    border-color: #c4b5fd;
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.08);
+    transform: translateY(-1px);
   }
 
-  .nb3-avatar,
-  .nb3-avatar-fallback {
+  .sg-nav-avatar,
+  .sg-nav-avatar-fallback {
     width: 100%;
     height: 100%;
-    border-radius: 12px;
+    border-radius: 11px;
   }
 
-  .nb3-avatar {
+  .sg-nav-avatar {
     display: block;
     object-fit: cover;
   }
 
-  .nb3-avatar-fallback {
+  .sg-nav-avatar-fallback {
     display: grid;
     place-items: center;
-    background:
-      linear-gradient(145deg, #f0eaff, #ddd2ff);
-    color: var(--nb3-violet-dark);
+    background: var(--sg-nav-violet-soft);
+    color: var(--sg-nav-violet);
     font-size: 13px;
     font-weight: 800;
   }
 
-  .nb3-profile-indicator {
+  .sg-nav-profile-status {
     position: absolute;
     right: -2px;
     bottom: -2px;
     width: 10px;
     height: 10px;
-    border: 2px solid var(--nb3-surface);
+    border: 2px solid white;
     border-radius: 50%;
-    background: var(--nb3-green);
+    background: var(--sg-nav-green);
   }
 
-  .nb3-logout-button {
+  .sg-nav-signout {
     display: grid;
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     place-items: center;
-    border: 1px solid transparent;
-    border-radius: 11px;
+    border: 0;
+    border-radius: 10px;
     background: transparent;
-    color: var(--nb3-faint);
+    color: var(--sg-nav-faint);
     cursor: pointer;
     transition:
       background 150ms ease,
-      border-color 150ms ease,
       color 150ms ease;
   }
 
-  .nb3-logout-button:hover {
-    border-color: #ffd1d1;
-    background: var(--nb3-red-soft);
-    color: var(--nb3-red);
+  .sg-nav-signout:hover {
+    background: var(--sg-nav-red-soft);
+    color: var(--sg-nav-red);
   }
 
-  .nb3-logout-button:disabled,
-  .nb3-mobile-logout:disabled {
+  .sg-nav-signout:disabled,
+  .sg-nav-mobile-signout:disabled {
     cursor: wait;
     opacity: 0.55;
   }
 
-  .nb3-menu-button {
+  .sg-nav-menu-button {
     display: none;
     width: 42px;
     height: 42px;
     margin-left: auto;
     place-items: center;
-    border: 1px solid var(--nb3-border);
+    border: 1px solid var(--sg-nav-border);
     border-radius: 12px;
     background: white;
-    color: var(--nb3-indigo);
+    color: var(--sg-nav-indigo);
     cursor: pointer;
-    box-shadow: 0 5px 14px rgba(27, 27, 58, 0.06);
+    box-shadow: 0 4px 12px rgba(27, 27, 58, 0.05);
   }
 
-  .nb3-mobile-backdrop {
+  .sg-nav-mobile-backdrop {
     position: fixed;
     inset: 0;
-    z-index: -1;
+    z-index: 78;
     border: 0;
-    background: rgba(20, 20, 38, 0.38);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: rgba(20, 20, 38, 0.34);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
   }
 
-  .nb3-mobile-menu {
-    width: min(520px, calc(100% - 24px));
-    margin: 0 auto 12px;
-    padding: 16px;
-    border: 1px solid var(--nb3-border);
+  .sg-nav-mobile-panel {
+    position: fixed;
+    top: 82px;
+    right: 16px;
+    left: 16px;
+    z-index: 79;
+    max-height: calc(100dvh - 98px);
+    overflow-y: auto;
+    padding: 18px;
+    border: 1px solid var(--sg-nav-border);
     border-radius: 20px;
     background: rgba(255, 253, 250, 0.99);
-    box-shadow: 0 24px 70px rgba(27, 27, 58, 0.2);
-    animation: nb3-menu-enter 180ms ease-out both;
+    box-shadow: 0 24px 70px rgba(27, 27, 58, 0.18);
+    animation: sg-nav-mobile-enter 180ms ease-out both;
   }
 
-  .nb3-mobile-profile {
+  .sg-nav-mobile-profile {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 4px;
+    padding: 2px 2px 16px;
+    border-bottom: 1px solid var(--sg-nav-border);
   }
 
-  .nb3-mobile-avatar-wrap {
+  .sg-nav-mobile-avatar-wrap {
     width: 46px;
     height: 46px;
     flex: 0 0 auto;
     overflow: hidden;
-    border: 1px solid var(--nb3-border);
+    border: 1px solid var(--sg-nav-border);
     border-radius: 14px;
   }
 
-  .nb3-mobile-avatar,
-  .nb3-mobile-avatar-fallback {
+  .sg-nav-mobile-avatar,
+  .sg-nav-mobile-avatar-fallback {
     width: 100%;
     height: 100%;
   }
 
-  .nb3-mobile-avatar {
+  .sg-nav-mobile-avatar {
     display: block;
     object-fit: cover;
   }
 
-  .nb3-mobile-avatar-fallback {
+  .sg-nav-mobile-avatar-fallback {
     display: grid;
     place-items: center;
-    background: linear-gradient(145deg, #f0eaff, #ddd2ff);
-    color: var(--nb3-violet-dark);
-    font-size: 14px;
+    background: var(--sg-nav-violet-soft);
+    color: var(--sg-nav-violet);
     font-weight: 800;
   }
 
-  .nb3-mobile-profile-copy {
+  .sg-nav-mobile-profile-copy {
     min-width: 0;
+    display: grid;
     flex: 1;
+    gap: 3px;
   }
 
-  .nb3-mobile-name {
+  .sg-nav-mobile-profile-copy strong,
+  .sg-nav-mobile-profile-copy span {
     overflow: hidden;
-    margin: 0;
-    color: var(--nb3-indigo);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sg-nav-mobile-profile-copy strong {
+    color: var(--sg-nav-indigo);
     font-size: 14px;
-    font-weight: 760;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  .nb3-mobile-university {
-    overflow: hidden;
-    margin: 3px 0 0;
-    color: var(--nb3-faint);
+  .sg-nav-mobile-profile-copy span {
+    color: var(--sg-nav-faint);
     font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  .nb3-mobile-profile-link {
+  .sg-nav-mobile-profile-link {
     display: grid;
     width: 38px;
     height: 38px;
     flex: 0 0 auto;
     place-items: center;
     border-radius: 11px;
-    background: var(--nb3-violet-soft);
-    color: var(--nb3-violet);
+    background: var(--sg-nav-violet-soft);
+    color: var(--sg-nav-violet);
   }
 
-  .nb3-mobile-section {
+  .sg-nav-mobile-section {
     margin-top: 16px;
-    padding-top: 15px;
-    border-top: 1px solid var(--nb3-border);
   }
 
-  .nb3-mobile-section-label {
+  .sg-nav-mobile-label {
     margin: 0 0 8px;
-    padding: 0 4px;
-    color: var(--nb3-faint);
+    color: var(--sg-nav-faint);
     font-family: var(--font-mono), monospace;
     font-size: 9px;
     font-weight: 750;
@@ -1052,19 +1050,19 @@ const navbarStyles = `
     text-transform: uppercase;
   }
 
-  .nb3-mobile-links {
+  .sg-nav-mobile-links {
     display: grid;
-    gap: 5px;
+    gap: 6px;
   }
 
-  .nb3-mobile-link {
+  .sg-nav-mobile-link {
     display: flex;
     min-height: 48px;
     align-items: center;
     gap: 11px;
-    padding: 0 12px;
+    padding: 0 13px;
     border-radius: 12px;
-    color: var(--nb3-muted);
+    color: var(--sg-nav-muted);
     font-size: 13px;
     font-weight: 650;
     text-decoration: none;
@@ -1073,47 +1071,43 @@ const navbarStyles = `
       color 150ms ease;
   }
 
-  .nb3-mobile-link > span:nth-child(2),
-  .nb3-mobile-link > span:first-child:last-of-type {
+  .sg-nav-mobile-link:hover,
+  .sg-nav-mobile-link--active {
+    background: var(--sg-nav-violet-soft);
+    color: var(--sg-nav-violet);
+  }
+
+  .sg-nav-mobile-link-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 9px;
+    background: rgba(124, 58, 237, 0.08);
+  }
+
+  .sg-nav-mobile-link > span:nth-child(2) {
     flex: 1;
   }
 
-  .nb3-mobile-link:hover,
-  .nb3-mobile-link--active {
-    background: var(--nb3-violet-soft);
-    color: var(--nb3-violet-dark);
-  }
-
-  .nb3-mobile-link-icon {
-    display: grid;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 auto;
-    place-items: center;
-    border-radius: 9px;
-    background: white;
-    box-shadow: inset 0 0 0 1px var(--nb3-border);
-  }
-
-  .nb3-mobile-chevron {
+  .sg-nav-mobile-chevron {
     margin-left: auto;
-    color: var(--nb3-faint);
+    color: var(--sg-nav-faint);
   }
 
-  .nb3-mobile-actions {
+  .sg-nav-mobile-actions {
     display: grid;
-    grid-template-columns: 1fr 1.25fr;
+    grid-template-columns: 1fr 1.2fr;
     gap: 8px;
-    margin-top: 16px;
-    padding-top: 15px;
-    border-top: 1px solid var(--nb3-border);
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--sg-nav-border);
   }
 
-  .nb3-mobile-action,
-  .nb3-mobile-logout {
-    display: flex;
+  .sg-nav-mobile-action,
+  .sg-nav-mobile-signout {
+    display: inline-flex;
     min-height: 48px;
-    width: 100%;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -1123,78 +1117,83 @@ const navbarStyles = `
     text-decoration: none;
   }
 
-  .nb3-mobile-action--live {
-    border: 1px solid #bce8d0;
-    background: var(--nb3-green-soft);
-    color: #087747;
+  .sg-nav-mobile-action--live {
+    border: 1px solid #cceedd;
+    background: var(--sg-nav-green-soft);
+    color: #087a4a;
   }
 
-  .nb3-mobile-action--live-active {
-    box-shadow: inset 3px 0 0 var(--nb3-green);
+  .sg-nav-mobile-action--live-active {
+    box-shadow: inset 3px 0 0 var(--sg-nav-green);
   }
 
-  .nb3-mobile-action--create {
-    border: 1px solid var(--nb3-violet);
-    background: var(--nb3-violet);
+  .sg-nav-mobile-action--create {
+    background: var(--sg-nav-violet);
     color: white;
-    box-shadow: 0 8px 20px rgba(124, 58, 237, 0.16);
   }
 
-  .nb3-mobile-logout {
+  .sg-nav-mobile-signout {
     grid-column: 1 / -1;
-    border: 1px solid #ffd1d1;
+    border: 1px solid #ffd3d3;
     background: white;
-    color: var(--nb3-red);
+    color: var(--sg-nav-red);
     cursor: pointer;
   }
 
-  .nb3-mobile-guest {
+  .sg-nav-mobile-guest {
     display: grid;
-    gap: 16px;
+    gap: 10px;
     margin-top: 16px;
-    padding: 17px;
+    padding: 18px;
     border-radius: 16px;
     background:
       linear-gradient(
-        145deg,
-        rgba(241, 237, 255, 0.9),
-        rgba(255, 255, 255, 0.96)
-      );
-    box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.09);
+        135deg,
+        rgba(124, 58, 237, 0.08),
+        rgba(56, 189, 248, 0.05)
+      ),
+      white;
   }
 
-  .nb3-mobile-guest-title {
+  .sg-nav-mobile-guest-kicker {
+    color: var(--sg-nav-violet);
+    font-family: var(--font-mono), monospace;
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .sg-nav-mobile-guest strong {
+    color: var(--sg-nav-indigo);
+    font-size: 18px;
+    letter-spacing: -0.03em;
+  }
+
+  .sg-nav-mobile-guest p {
     margin: 0;
-    color: var(--nb3-indigo);
-    font-size: 16px;
-    font-weight: 780;
-    letter-spacing: -0.025em;
+    color: var(--sg-nav-muted);
+    font-size: 13px;
+    line-height: 1.6;
   }
 
-  .nb3-mobile-guest-copy {
-    margin: 5px 0 0;
-    color: var(--nb3-muted);
-    font-size: 12px;
-    line-height: 1.55;
-  }
-
-  .nb3-brand:focus-visible,
-  .nb3-link:focus-visible,
-  .nb3-public-link:focus-visible,
-  .nb3-live-button:focus-visible,
-  .nb3-create-button:focus-visible,
-  .nb3-login-button:focus-visible,
-  .nb3-profile-link:focus-visible,
-  .nb3-logout-button:focus-visible,
-  .nb3-menu-button:focus-visible,
-  .nb3-mobile-link:focus-visible,
-  .nb3-mobile-action:focus-visible,
-  .nb3-mobile-logout:focus-visible {
+  .sg-nav-brand:focus-visible,
+  .sg-nav-public-link:focus-visible,
+  .sg-nav-app-link:focus-visible,
+  .sg-nav-live-button:focus-visible,
+  .sg-nav-create-button:focus-visible,
+  .sg-nav-signin:focus-visible,
+  .sg-nav-profile:focus-visible,
+  .sg-nav-signout:focus-visible,
+  .sg-nav-menu-button:focus-visible,
+  .sg-nav-mobile-link:focus-visible,
+  .sg-nav-mobile-action:focus-visible,
+  .sg-nav-mobile-signout:focus-visible {
     outline: 3px solid rgba(124, 58, 237, 0.22);
     outline-offset: 2px;
   }
 
-  @keyframes nb3-menu-enter {
+  @keyframes sg-nav-mobile-enter {
     from {
       opacity: 0;
       transform: translateY(-8px) scale(0.985);
@@ -1206,66 +1205,78 @@ const navbarStyles = `
     }
   }
 
-  @media (max-width: 980px) {
-    .nb3-desktop-links,
-    .nb3-desktop-actions {
+  @media (max-width: 960px) {
+    .sg-nav-public-links,
+    .sg-nav-app-links,
+    .sg-nav-actions {
       display: none;
     }
 
-    .nb3-menu-button {
+    .sg-nav-menu-button {
       display: grid;
     }
   }
 
-  @media (max-width: 620px) {
-    .nb3-nav {
+  @media (max-width: 560px) {
+    .sg-nav-shell {
       width: calc(100% - 28px);
       min-height: 66px;
     }
 
-    .nb3-brand-icon {
-      width: 35px;
-      height: 35px;
-      border-radius: 11px;
-    }
+.sg-nav-brand-mark {
+  width: 35px;
+  height: 35px;
+  flex-basis: 35px;
+}
 
-    .nb3-brand-name {
-      font-size: 14px;
-    }
+.sg-nav-brand-logo {
+  width: 35px;
+  height: 35px;
+}
 
-    .nb3-brand-status {
+.sg-nav-brand-name {
+  font-size: 15px;
+}
+    .sg-nav-brand-subtitle {
       font-size: 7px;
     }
 
-    .nb3-mobile-actions {
+    .sg-nav-mobile-panel {
+      top: 74px;
+      max-height: calc(100dvh - 88px);
+    }
+
+    .sg-nav-mobile-actions {
       grid-template-columns: 1fr;
     }
 
-    .nb3-mobile-logout {
+    .sg-nav-mobile-signout {
       grid-column: auto;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .nb3-mobile-menu {
+    .sg-nav-mobile-panel {
       animation: none;
     }
 
-    .nb3-link,
-    .nb3-public-link,
-    .nb3-live-button,
-    .nb3-create-button,
-    .nb3-login-button,
-    .nb3-profile-link,
-    .nb3-logout-button,
-    .nb3-mobile-link {
+    .sg-nav-public-link,
+    .sg-nav-app-link,
+    .sg-nav-live-button,
+    .sg-nav-create-button,
+    .sg-nav-signin,
+    .sg-nav-profile,
+    .sg-nav-signout,
+    .sg-nav-mobile-link {
       transition: none;
     }
 
-    .nb3-create-button:hover,
-    .nb3-login-button:hover,
-    .nb3-profile-link:hover,
-    .nb3-profile-link--active {
+    .sg-nav-public-link:hover,
+    .sg-nav-app-link:hover,
+    .sg-nav-live-button:hover,
+    .sg-nav-create-button:hover,
+    .sg-nav-signin:hover,
+    .sg-nav-profile:hover {
       transform: none;
     }
   }

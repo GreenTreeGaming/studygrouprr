@@ -927,77 +927,137 @@ function ProblemSection() {
   return (
       <section id="why-it-exists" className={styles.problemSection}>
         <div className={styles.problemGrid} aria-hidden="true" />
+        <div className={styles.problemGlow} aria-hidden="true" />
 
-        <div className={styles.problemLayout}>
-          <div className={`${styles.problemLead} ${styles.reveal}`}>
-            <p className={styles.darkKicker}>Why this needs to exist</p>
-            <h2>Campuses are full of students studying alone, together.</h2>
-            <p>
-              You can sit twenty feet from someone in your class and never know
-              they are working on the same assignment.
-            </p>
+        <div className={styles.problemShell}>
+          <div className={`${styles.problemIntro} ${styles.reveal}`}>
+            <div className={styles.problemIntroTop}>
+              <p className={styles.darkKicker}>Why this needs to exist</p>
+
+              <span className={styles.problemIndex} aria-hidden="true">
+              03 / THE GAP
+            </span>
+            </div>
+
+            <div className={styles.problemHeadlineRow}>
+              <h2>
+                Campuses are full of students
+                <span> studying alone, together.</span>
+              </h2>
+
+              <p>
+                You can sit twenty feet from someone in your class and never know
+                they are working on the exact same assignment.
+              </p>
+            </div>
           </div>
 
-          <div className={`${styles.problemStory} ${styles.reveal}`}>
-            <div className={styles.beforeState}>
-              <p>“I need someone to study CS400 with.”</p>
+          <div className={`${styles.problemExperience} ${styles.reveal}`}>
+            <div className={styles.problemBefore}>
+              <div className={styles.problemStateLabel}>
+                <span className={styles.problemStateNumber}>01</span>
+                <span>Without StudyGrouprr</span>
+              </div>
+
+              <blockquote>
+                “I need someone to study CS400 with.”
+              </blockquote>
+
               <ul>
                 <li>
                   <span>Group chat</span>
                   <strong>147 unread messages</strong>
                 </li>
+
                 <li>
                   <span>Course server</span>
                   <strong>Nobody replies</strong>
                 </li>
+
                 <li>
                   <span>Library</span>
                   <strong>No idea who is in CS400</strong>
                 </li>
               </ul>
-            </div>
 
-            <div className={styles.problemArrow} aria-hidden="true">
-              <span />
-              <ArrowRight size={22} />
-            </div>
-
-            <div className={styles.afterState}>
-              <div className={styles.afterTopline}>
-                <span>CS400</span>
-                <small>
-                  <i aria-hidden="true" /> 3 students nearby
-                </small>
+              <div className={styles.problemBeforeNote}>
+                The people are nearby. The signal is missing.
               </div>
-              <article>
-                <Avatar initial="S" tone="violet" />
+            </div>
+
+            <div className={styles.problemBridge} aria-hidden="true">
+            <span className={styles.problemBridgeLabel}>
+              StudyGrouprr
+            </span>
+
+              <div className={styles.problemBridgeLine}>
+                <span />
+                <ArrowRight size={20} />
+              </div>
+            </div>
+
+            <div className={styles.problemAfter}>
+              <div className={styles.problemStateLabel}>
+                <span className={styles.problemStateNumber}>02</span>
+                <span>With StudyGrouprr</span>
+              </div>
+
+              <div className={styles.problemCourseHeader}>
                 <div>
-                  <strong>Sarah is studying now</strong>
-                  <span>Memorial Library · 0.3 miles</span>
+                  <span>CS400</span>
+                  <small>Algorithms</small>
                 </div>
+
+                <span className={styles.problemLiveBadge}>
+                <i aria-hidden="true" />
+                3 nearby
+              </span>
+              </div>
+
+              <article className={styles.problemResultCard}>
+                <Avatar initial="S" tone="violet" />
+
+                <div>
+                <span className={styles.problemResultStatus}>
+                  Studying now
+                </span>
+                  <strong>Sarah</strong>
+                  <small>Memorial Library · 0.3 miles</small>
+                </div>
+
                 <ArrowRight size={16} />
               </article>
-              <article>
-              <span className={styles.afterClock}>
+
+              <article className={styles.problemResultCard}>
+              <span className={styles.problemResultIcon}>
                 <Clock3 size={17} />
               </span>
+
                 <div>
+                <span className={styles.problemResultStatus}>
+                  Starting soon
+                </span>
                   <strong>CS400 Midterm Review</strong>
-                  <span>Union South · Starts at 6:00 PM</span>
+                  <small>Union South · 6:00 PM</small>
                 </div>
+
                 <ArrowRight size={16} />
               </article>
             </div>
           </div>
-        </div>
 
-        <div className={`${styles.notThisBlock} ${styles.reveal}`}>
-          <div>
-            <span>Not an AI tutor</span>
-            <span>Not a notes app</span>
-            <span>Not another Discord server</span>
+          <div className={`${styles.problemPositioning} ${styles.reveal}`}>
+            <div className={styles.problemPositioningList}>
+              <span>Not an AI tutor</span>
+              <span>Not a notes app</span>
+              <span>Not another Discord server</span>
+            </div>
+
+            <div className={styles.problemPositioningAnswer}>
+              <small>The actual product</small>
+              <strong>A way to find people.</strong>
+            </div>
           </div>
-          <strong>A way to find people.</strong>
         </div>
       </section>
   );
