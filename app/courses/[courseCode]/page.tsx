@@ -1,24 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import { useRequireOnboarding } from "@/hooks/useRequiredOnboarding";
-import {
-  Users,
-  CalendarDays,
-  ArrowLeft,
-  MapPin,
-  Plus, Check,
-    BookOpen,
-} from "lucide-react";
+/* eslint-disable @next/next/no-img-element */
 
 import {
-  normalizeCourseCode,
-  isValidCourseCode,
-} from "@/lib/courseValidation";
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  Clock3,
+  GraduationCap,
+  MapPin,
+  Plus,
+  Radio,
+  SearchX,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
+
 import AlertModal from "@/components/AlertModal";
+import { useRequireOnboarding } from "@/hooks/useRequiredOnboarding";
+import {
+  isValidCourseCode,
+  normalizeCourseCode,
+} from "@/lib/courseValidation";
+import { supabase } from "@/lib/supabase";
+
+import styles from "./course.module.css";
+
+type AlertType =
+    | "success"
+    | "error"
+    | "warning"
+    | "info";
+
+type AlertConfig = {
+  title: string;
+  message: string;
+  type: AlertType;
+};
+
+type SessionState =
+    | "live"
+    | "soon"
+    | "upcoming";
 
 type Session = {
   id: string;
@@ -30,7 +68,16 @@ type Session = {
   creator_id: string;
 };
 
-type LiveStudent = {
+type LiveStudentProfile = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  university: string | null;
+  major: string | null;
+  year: string | null;
+};
+
+type LiveStudentRow = {
   id: string;
   user_id: string;
   course_code: string;
@@ -38,65 +85,377 @@ type LiveStudent = {
   description: string | null;
   identification: string | null;
   created_at: string;
-
-  profiles: {
-    name: string | null;
-    avatar_url: string | null;
-    major: string | null;
-    year: string | null;
-  } | null;
+  profiles:
+      | LiveStudentProfile
+      | LiveStudentProfile[]
+      | null;
 };
 
+type LiveStudent = Omit<
+    LiveStudentRow,
+    "profiles"
+> & {
+  profile: LiveStudentProfile | null;
+};
+
+type Friendship = {
+  requester_id: string;
+  receiver_id: string;
+  status: string;
+};
+
+const LIVE_DURATION_MS =
+    2 * 60 * 60 * 1000;
+
+function normalizeRelation<T>(
+    relation: T | T[] | null,
+): T | null {
+  if (Array.isArray(relation)) {
+    return relation[0] ?? null;
+  }
+
+  return relation;
+}
+
+function getInitial(
+    name: string | null | undefined,
+): string {
+  return (
+      name?.trim().charAt(0).toUpperCase() ||
+      "S"
+  );
+}
+
+function SafeAvatar({
+                      src,
+                      name,
+                    }: {
+  src: string | null | undefined;
+  name: string | null | undefined;
+}) {
+  const [imageFailed, setImageFailed] =
+      useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
+
+  const canRenderImage =
+      typeof src === "string" &&
+      src.trim().length > 0 &&
+      !imageFailed;
+
+  if (!canRenderImage) {
+    return (
+        <span aria-hidden="true">
+        {getInitial(name)}
+      </span>
+    );
+  }
+
+  return (
+      <img
+          src={src}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setImageFailed(true)}
+      />
+  );
+}
+
+function getSessionState(
+    session: Session,
+    now: Date,
+): SessionState {
+  const start = new Date(
+      session.start_time,
+  );
+
+  const end = new Date(
+      session.end_time,
+  );
+
+  if (start <= now && end > now) {
+    return "live";
+  }
+
+  const minutesUntilStart =
+      (start.getTime() -
+          now.getTime()) /
+      60_000;
+
+  if (
+      minutesUntilStart > 0 &&
+      minutesUntilStart <= 30
+  ) {
+    return "soon";
+  }
+
+  return "upcoming";
+}
+
+function getSessionStateLabel(
+    state: SessionState,
+): string {
+  switch (state) {
+    case "live":
+      return "Happening now";
+    case "soon":
+      return "Starting soon";
+    default:
+      return "Upcoming";
+  }
+}
+
+function formatSessionDate(
+    value: string,
+): string {
+  const date = new Date(value);
+  const now = new Date();
+
+  const dateStart = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+  );
+
+  const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+  );
+
+  const difference = Math.round(
+      (dateStart.getTime() -
+          todayStart.getTime()) /
+      86_400_000,
+  );
+
+  if (difference === 0) {
+    return "Today";
+  }
+
+  if (difference === 1) {
+    return "Tomorrow";
+  }
+
+  return date.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatSessionTimeRange(
+    session: Session,
+): string {
+  const options:
+      Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+  };
+
+  return `${new Date(
+      session.start_time,
+  ).toLocaleTimeString(
+      [],
+      options,
+  )} – ${new Date(
+      session.end_time,
+  ).toLocaleTimeString([], options)}`;
+}
+
+function getRelativeStart(
+    session: Session,
+    now: Date,
+): string {
+  const start = new Date(
+      session.start_time,
+  );
+
+  const end = new Date(
+      session.end_time,
+  );
+
+  if (start <= now && end > now) {
+    const remainingMinutes =
+        Math.max(
+            1,
+            Math.ceil(
+                (end.getTime() -
+                    now.getTime()) /
+                60_000,
+            ),
+        );
+
+    return remainingMinutes < 60
+        ? `${remainingMinutes}m remaining`
+        : `${Math.floor(
+            remainingMinutes / 60,
+        )}h remaining`;
+  }
+
+  const minutesUntilStart =
+      Math.max(
+          1,
+          Math.ceil(
+              (start.getTime() -
+                  now.getTime()) /
+              60_000,
+          ),
+      );
+
+  if (minutesUntilStart < 60) {
+    return `Starts in ${minutesUntilStart}m`;
+  }
+
+  if (minutesUntilStart < 24 * 60) {
+    const hours = Math.floor(
+        minutesUntilStart / 60,
+    );
+
+    const minutes =
+        minutesUntilStart % 60;
+
+    return minutes
+        ? `Starts in ${hours}h ${minutes}m`
+        : `Starts in ${hours}h`;
+  }
+
+  return formatSessionDate(
+      session.start_time,
+  );
+}
+
+function formatLiveDuration(
+    createdAt: string,
+    currentTime: number,
+): string {
+  const elapsedMinutes = Math.max(
+      0,
+      Math.floor(
+          (currentTime -
+              new Date(
+                  createdAt,
+              ).getTime()) /
+          60_000,
+      ),
+  );
+
+  if (elapsedMinutes < 1) {
+    return "Just went live";
+  }
+
+  if (elapsedMinutes < 60) {
+    return `Live for ${elapsedMinutes}m`;
+  }
+
+  const hours = Math.floor(
+      elapsedMinutes / 60,
+  );
+
+  const minutes =
+      elapsedMinutes % 60;
+
+  return minutes
+      ? `Live for ${hours}h ${minutes}m`
+      : `Live for ${hours}h`;
+}
+
 export default function CoursePage() {
+  const params = useParams();
+  const router = useRouter();
+
   const {
     profile,
     loading: onboardingLoading,
   } = useRequireOnboarding();
-  const params = useParams();
-  const router = useRouter();
+
+  const rawCourseCode =
+      Array.isArray(
+          params.courseCode,
+      )
+          ? params.courseCode[0]
+          : String(
+              params.courseCode || "",
+          );
 
   const courseCode =
       normalizeCourseCode(
-          params.courseCode as string
+          decodeURIComponent(
+              rawCourseCode,
+          ),
       );
 
-  const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [studentCount, setStudentCount] = useState(0);
-  const [isMyCourse, setIsMyCourse] = useState(false);
-  const [savingCourse, setSavingCourse] = useState(false);
+  const [loading, setLoading] =
+      useState(true);
 
-  const [alertOpen, setAlertOpen] = useState(false);
+  const [loadError, setLoadError] =
+      useState<string | null>(null);
+
+  const [sessions, setSessions] =
+      useState<Session[]>([]);
+
+  const [
+    attendeeCounts,
+    setAttendeeCounts,
+  ] = useState<Record<string, number>>(
+      {},
+  );
+
+  const [studentCount, setStudentCount] =
+      useState(0);
+
+  const [isMyCourse, setIsMyCourse] =
+      useState(false);
+
+  const [savingCourse, setSavingCourse] =
+      useState(false);
 
   const [liveStudents, setLiveStudents] =
       useState<LiveStudent[]>([]);
 
-  const [alertConfig, setAlertConfig] = useState({
+  const [
+    acceptedBuddyIds,
+    setAcceptedBuddyIds,
+  ] = useState<Set<string>>(
+      new Set(),
+  );
 
-    title: "",
+  const [
+    pendingBuddyIds,
+    setPendingBuddyIds,
+  ] = useState<Set<string>>(
+      new Set(),
+  );
 
-    message: "",
+  const [
+    buddyBusyIds,
+    setBuddyBusyIds,
+  ] = useState<Set<string>>(
+      new Set(),
+  );
 
-    type: "info" as
+  const [currentTime, setCurrentTime] =
+      useState(Date.now());
 
-        | "success"
+  const [alertOpen, setAlertOpen] =
+      useState(false);
 
-        | "error"
+  const [alertConfig, setAlertConfig] =
+      useState<AlertConfig>({
+        title: "",
+        message: "",
+        type: "info",
+      });
 
-        | "warning"
-
-        | "info",
-
-  });
+  const university =
+      profile?.university;
 
   function showAlert(
       title: string,
       message: string,
-      type:
-          | "success"
-          | "error"
-          | "warning"
-          | "info" = "info"
+      type: AlertType = "info",
   ) {
     setAlertConfig({
       title,
@@ -108,1038 +467,1376 @@ export default function CoursePage() {
   }
 
   useEffect(() => {
-    if (!profile?.university) {
+    const intervalId =
+        window.setInterval(() => {
+          setCurrentTime(Date.now());
+        }, 60_000);
+
+    return () => {
+      window.clearInterval(
+          intervalId,
+      );
+    };
+  }, []);
+
+  const loadCourse =
+      useCallback(async () => {
+        if (
+            !isValidCourseCode(
+                courseCode,
+            )
+        ) {
+          router.replace(
+              "/sessions",
+          );
+          return;
+        }
+
+        if (!university) {
+          return;
+        }
+
+        setLoading(true);
+        setLoadError(null);
+
+        try {
+          const {
+            data: { user },
+            error: userError,
+          } =
+              await supabase.auth.getUser();
+
+          if (userError) {
+            throw userError;
+          }
+
+          if (!user) {
+            router.replace(
+                "/login",
+            );
+            return;
+          }
+
+          const nowIso =
+              new Date().toISOString();
+
+          const twoHoursAgoIso =
+              new Date(
+                  Date.now() -
+                  LIVE_DURATION_MS,
+              ).toISOString();
+
+          const [
+            courseResult,
+            sessionsResult,
+            liveResult,
+            friendshipsResult,
+          ] = await Promise.all([
+            supabase
+                .from("user_courses")
+                .select("course_code")
+                .eq("user_id", user.id)
+                .eq(
+                    "course_code",
+                    courseCode,
+                )
+                .maybeSingle(),
+
+            supabase
+                .from("study_sessions")
+                .select(`
+              id,
+              title,
+              course_code,
+              location_name,
+              start_time,
+              end_time,
+              creator_id,
+              profiles!study_sessions_creator_id_fkey!inner (
+                university
+              )
+            `)
+                .eq(
+                    "course_code",
+                    courseCode,
+                )
+                .eq(
+                    "profiles.university",
+                    university,
+                )
+                .gt(
+                    "end_time",
+                    nowIso,
+                )
+                .order(
+                    "start_time",
+                    {
+                      ascending: true,
+                    },
+                ),
+
+            supabase
+                .from("live_study_status")
+                .select(`
+              id,
+              user_id,
+              course_code,
+              location_name,
+              description,
+              identification,
+              created_at,
+              profiles!inner (
+                id,
+                name,
+                avatar_url,
+                university,
+                major,
+                year
+              )
+            `)
+                .eq(
+                    "course_code",
+                    courseCode,
+                )
+                .eq(
+                    "profiles.university",
+                    university,
+                )
+                .gte(
+                    "created_at",
+                    twoHoursAgoIso,
+                )
+                .order(
+                    "created_at",
+                    {
+                      ascending: false,
+                    },
+                ),
+
+            supabase
+                .from("friendships")
+                .select(
+                    "requester_id, receiver_id, status",
+                )
+                .or(
+                    `requester_id.eq.${user.id},receiver_id.eq.${user.id}`,
+                ),
+          ]);
+
+          const firstError =
+              courseResult.error ||
+              sessionsResult.error ||
+              liveResult.error ||
+              friendshipsResult.error;
+
+          if (firstError) {
+            throw firstError;
+          }
+
+          const activeSessions =
+              (sessionsResult.data ??
+                  []) as Session[];
+
+          const formattedLiveStudents =
+              (
+                  (liveResult.data ??
+                      []) as unknown as LiveStudentRow[]
+              ).map((student) => ({
+                id: student.id,
+                user_id:
+                student.user_id,
+                course_code:
+                student.course_code,
+                location_name:
+                student.location_name,
+                description:
+                student.description,
+                identification:
+                student.identification,
+                created_at:
+                student.created_at,
+                profile:
+                    normalizeRelation(
+                        student.profiles,
+                    ),
+              }));
+
+          const studentIds =
+              new Set<string>();
+
+          const attendanceSets =
+              new Map<
+                  string,
+                  Set<string>
+              >();
+
+          activeSessions.forEach(
+              (session) => {
+                studentIds.add(
+                    session.creator_id,
+                );
+
+                attendanceSets.set(
+                    session.id,
+                    new Set([
+                      session.creator_id,
+                    ]),
+                );
+              },
+          );
+
+          const sessionIds =
+              activeSessions.map(
+                  (session) =>
+                      session.id,
+              );
+
+          if (
+              sessionIds.length > 0
+          ) {
+            const {
+              data: members,
+              error: membersError,
+            } = await supabase
+                .from("session_members")
+                .select(
+                    "session_id, user_id",
+                )
+                .in(
+                    "session_id",
+                    sessionIds,
+                );
+
+            if (membersError) {
+              throw membersError;
+            }
+
+            (
+                members ?? []
+            ).forEach((member) => {
+              studentIds.add(
+                  member.user_id,
+              );
+
+              const memberSet =
+                  attendanceSets.get(
+                      member.session_id,
+                  ) ??
+                  new Set<string>();
+
+              memberSet.add(
+                  member.user_id,
+              );
+
+              attendanceSets.set(
+                  member.session_id,
+                  memberSet,
+              );
+            });
+          }
+
+          formattedLiveStudents.forEach(
+              (student) => {
+                studentIds.add(
+                    student.user_id,
+                );
+              },
+          );
+
+          const nextCounts:
+              Record<string, number> = {};
+
+          attendanceSets.forEach(
+              (memberIds, sessionId) => {
+                nextCounts[sessionId] =
+                    memberIds.size;
+              },
+          );
+
+          const acceptedIds =
+              new Set<string>();
+
+          const pendingIds =
+              new Set<string>();
+
+          (
+              (friendshipsResult.data ??
+                  []) as Friendship[]
+          ).forEach(
+              (friendship) => {
+                const otherUserId =
+                    friendship.requester_id ===
+                    user.id
+                        ? friendship.receiver_id
+                        : friendship.requester_id;
+
+                if (
+                    friendship.status ===
+                    "accepted"
+                ) {
+                  acceptedIds.add(
+                      otherUserId,
+                  );
+                } else {
+                  pendingIds.add(
+                      otherUserId,
+                  );
+                }
+              },
+          );
+
+          setIsMyCourse(
+              Boolean(
+                  courseResult.data,
+              ),
+          );
+
+          setSessions(
+              activeSessions,
+          );
+
+          setAttendeeCounts(
+              nextCounts,
+          );
+
+          setLiveStudents(
+              formattedLiveStudents,
+          );
+
+          setStudentCount(
+              studentIds.size,
+          );
+
+          setAcceptedBuddyIds(
+              acceptedIds,
+          );
+
+          setPendingBuddyIds(
+              pendingIds,
+          );
+        } catch (error) {
+          console.error(
+              "Unable to load course:",
+              error,
+          );
+
+          setLoadError(
+              error instanceof Error
+                  ? error.message
+                  : "This course could not be loaded.",
+          );
+
+          setSessions([]);
+          setLiveStudents([]);
+          setAttendeeCounts({});
+          setStudentCount(0);
+        } finally {
+          setLoading(false);
+        }
+      }, [
+        courseCode,
+        router,
+        university,
+      ]);
+
+  useEffect(() => {
+    if (!university) {
       return;
     }
 
     void loadCourse();
-  }, [courseCode, profile?.university]);
+  }, [
+    loadCourse,
+    university,
+  ]);
 
-  async function loadCourse() {
-    if (!isValidCourseCode(courseCode)) {
-      router.replace("/sessions");
+  const activeLiveStudents =
+      useMemo(
+          () =>
+              liveStudents.filter(
+                  (student) =>
+                      currentTime -
+                      new Date(
+                          student.created_at,
+                      ).getTime() <
+                      LIVE_DURATION_MS,
+              ),
+          [
+            currentTime,
+            liveStudents,
+          ],
+      );
+
+  const now = useMemo(
+      () => new Date(currentTime),
+      [currentTime],
+  );
+
+  async function addToMyCourses() {
+    if (
+        savingCourse ||
+        isMyCourse
+    ) {
       return;
     }
 
-    if (!profile?.university) {
+    if (
+        !isValidCourseCode(
+            courseCode,
+        )
+    ) {
+      showAlert(
+          "Invalid course",
+          "This course code is not valid.",
+          "error",
+      );
       return;
     }
 
-    setLoading(true);
+    setSavingCourse(true);
 
     try {
       const {
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser();
+      } =
+          await supabase.auth.getUser();
 
       if (userError) {
         throw userError;
       }
 
       if (!user) {
-        router.replace("/login");
-        return;
+        throw new Error(
+            "You must be signed in to add this course.",
+        );
       }
 
-      const now = new Date().toISOString();
-      const twoHoursAgo = new Date(
-          Date.now() - 2 * 60 * 60 * 1000
-      ).toISOString();
+      const { error } =
+          await supabase
+              .from("user_courses")
+              .upsert(
+                  {
+                    user_id: user.id,
+                    course_code:
+                    courseCode,
+                  },
+                  {
+                    onConflict:
+                        "user_id,course_code",
+                  },
+              );
 
-      /*
-       * Determine whether this is one of the current user's courses.
-       */
-      const { data: existingCourse, error: courseError } = await supabase
-          .from("user_courses")
-          .select("course_code")
-          .eq("user_id", user.id)
-          .eq("course_code", courseCode)
-          .maybeSingle();
-
-      if (courseError) {
-        throw courseError;
+      if (error) {
+        throw error;
       }
 
-      setIsMyCourse(Boolean(existingCourse));
-
-      /*
-       * Only return active sessions for this course and university.
-       */
-      const { data: sessionRows, error: sessionsError } = await supabase
-          .from("study_sessions")
-          .select(`
-        id,
-        title,
-        course_code,
-        location_name,
-        start_time,
-        end_time,
-        creator_id,
-        profiles!study_sessions_creator_id_fkey!inner (
-          university
-        )
-      `)
-          .eq("course_code", courseCode)
-          .eq("profiles.university", profile.university)
-          .gt("end_time", now)
-          .order("start_time", { ascending: true });
-
-      if (sessionsError) {
-        throw sessionsError;
-      }
-
-      const activeSessions = (sessionRows ?? []) as Session[];
-
-      setSessions(activeSessions);
-
-      const studentIds = new Set<string>();
-
-      activeSessions.forEach((session) => {
-        studentIds.add(session.creator_id);
-      });
-
-      /*
-       * Only fetch attendees for the same-university sessions returned above.
-       */
-      const sessionIds = activeSessions.map((session) => session.id);
-
-      if (sessionIds.length > 0) {
-        const { data: members, error: membersError } = await supabase
-            .from("session_members")
-            .select("user_id")
-            .in("session_id", sessionIds);
-
-        if (membersError) {
-          throw membersError;
-        }
-
-        members?.forEach((member) => {
-          studentIds.add(member.user_id);
-        });
-      }
-
-      /*
-       * Only return live students from this university.
-       */
-      const { data: liveRows, error: liveError } = await supabase
-          .from("live_study_status")
-          .select(`
-        id,
-        user_id,
-        course_code,
-        location_name,
-        description,
-        identification,
-        created_at,
-        profiles!inner (
-          name,
-          avatar_url,
-          major,
-          year
-        )
-      `)
-          .eq("course_code", courseCode)
-          .eq("profiles.university", profile.university)
-          .gte("created_at", twoHoursAgo)
-          .order("created_at", { ascending: false });
-
-      if (liveError) {
-        throw liveError;
-      }
-
-      const liveStudentsForUniversity =
-          (liveRows ?? []) as LiveStudent[];
-
-      liveStudentsForUniversity.forEach((student) => {
-        studentIds.add(student.user_id);
-      });
-
-      setLiveStudents(liveStudentsForUniversity);
-      setStudentCount(studentIds.size);
-    } catch (error) {
-      console.error("Unable to load course:", error);
-
-      setSessions([]);
-      setLiveStudents([]);
-      setStudentCount(0);
+      setIsMyCourse(true);
 
       showAlert(
-          "Unable to Load Course",
-          "This course could not be loaded. Please try again.",
-          "error"
+          "Course added",
+          `${courseCode} was added to My Courses.`,
+          "success",
+      );
+    } catch (error) {
+      showAlert(
+          "Unable to add course",
+          error instanceof Error
+              ? error.message
+              : "This course could not be added.",
+          "error",
       );
     } finally {
-      setLoading(false);
+      setSavingCourse(false);
     }
   }
 
-  async function addToMyCourses() {
-    if (!isValidCourseCode(courseCode)) {
+  async function sendBuddyRequest(
+      receiverId: string,
+  ) {
+    if (
+        !receiverId ||
+        receiverId ===
+        profile?.id ||
+        buddyBusyIds.has(
+            receiverId,
+        )
+    ) {
+      return;
+    }
+
+    if (
+        acceptedBuddyIds.has(
+            receiverId,
+        )
+    ) {
       showAlert(
-          "Invalid Course",
-          "This course code is not valid.",
-          "error"
+          "Already connected",
+          "This student is already one of your study buddies.",
+          "info",
       );
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    if (
+        pendingBuddyIds.has(
+            receiverId,
+        )
+    ) {
+      showAlert(
+          "Request pending",
+          "A study-buddy request already exists.",
+          "info",
+      );
+      return;
+    }
 
-    if (!user) return;
+    setBuddyBusyIds(
+        (current) => {
+          const next =
+              new Set(current);
 
-    setSavingCourse(true);
+          next.add(receiverId);
 
-    const { error } = await supabase
-        .from("user_courses")
-        .upsert(
-            {
-              user_id: user.id,
-              course_code: courseCode,
-            },
-            {
-              onConflict: "user_id,course_code",
-            }
+          return next;
+        },
+    );
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } =
+          await supabase.auth.getUser();
+
+      if (userError) {
+        throw userError;
+      }
+
+      if (!user) {
+        throw new Error(
+            "You must be signed in to add a study buddy.",
+        );
+      }
+
+      const {
+        data: existing,
+        error: checkError,
+      } = await supabase
+          .from("friendships")
+          .select("id, status")
+          .or(
+              `and(requester_id.eq.${user.id},receiver_id.eq.${receiverId}),and(requester_id.eq.${receiverId},receiver_id.eq.${user.id})`,
+          )
+          .maybeSingle();
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existing) {
+        if (
+            existing.status ===
+            "accepted"
+        ) {
+          setAcceptedBuddyIds(
+              (current) => {
+                const next =
+                    new Set(current);
+
+                next.add(
+                    receiverId,
+                );
+
+                return next;
+              },
+          );
+        } else {
+          setPendingBuddyIds(
+              (current) => {
+                const next =
+                    new Set(current);
+
+                next.add(
+                    receiverId,
+                );
+
+                return next;
+              },
+          );
+        }
+
+        showAlert(
+            "Connection already exists",
+            existing.status ===
+            "accepted"
+                ? "This student is already one of your study buddies."
+                : "A study-buddy request is already pending.",
+            "info",
         );
 
-    if (error) {
-      showAlert(
-          "Unable to Add Course",
-          error.message,
-          "error"
+        return;
+      }
+
+      const { error } =
+          await supabase
+              .from("friendships")
+              .insert({
+                requester_id:
+                user.id,
+                receiver_id:
+                receiverId,
+                status: "pending",
+              });
+
+      if (error) {
+        throw error;
+      }
+
+      setPendingBuddyIds(
+          (current) => {
+            const next =
+                new Set(current);
+
+            next.add(receiverId);
+
+            return next;
+          },
       );
-    } else {
-      setIsMyCourse(true);
+
+      window.dispatchEvent(
+          new Event(
+              "buddy-requests-changed",
+          ),
+      );
 
       showAlert(
-          "Course Added",
-          `${courseCode} has been added to My Courses.`,
-          "success"
+          "Request sent",
+          "Your study-buddy request was sent.",
+          "success",
+      );
+    } catch (error) {
+      showAlert(
+          "Unable to send request",
+          error instanceof Error
+              ? error.message
+              : "Your request could not be sent.",
+          "error",
+      );
+    } finally {
+      setBuddyBusyIds(
+          (current) => {
+            const next =
+                new Set(current);
+
+            next.delete(
+                receiverId,
+            );
+
+            return next;
+          },
+      );
+    }
+  }
+
+  function renderBuddyAction(
+      studentId: string,
+  ): ReactNode {
+    if (
+        studentId === profile?.id
+    ) {
+      return (
+          <span
+              className={styles.buddyState}
+          >
+          <Check size={14} />
+          You
+        </span>
       );
     }
 
-    setSavingCourse(false);
-  }
+    if (
+        acceptedBuddyIds.has(
+            studentId,
+        )
+    ) {
+      return (
+          <Link
+              href="/buddies"
+              className={styles.buddyState}
+          >
+            <Check size={14} />
+            Buddy
+          </Link>
+      );
+    }
 
-  function getSessionUrgency(startTime: string): "live" | "soon" | "today" | "later" {
-    const now = new Date();
-    const start = new Date(startTime);
-    const diffMin = (start.getTime() - now.getTime()) / 60000;
-    if (diffMin <= 0) return "live";
-    if (diffMin <= 30) return "soon";
-    if (diffMin <= 120) return "today";
-    return "later";
-  }
+    if (
+        pendingBuddyIds.has(
+            studentId,
+        )
+    ) {
+      return (
+          <span
+              className={styles.buddyState}
+          >
+          <Clock3 size={14} />
+          Pending
+        </span>
+      );
+    }
 
-  function formatSessionTime(startTime: string): string {
-    const now = new Date();
-    const start = new Date(startTime);
-    const diffMin = (start.getTime() - now.getTime()) / 60000;
-    if (diffMin <= 0) return "Happening now";
-    if (diffMin < 60) return `In ${Math.round(diffMin)}m`;
-    if (diffMin < 1440) return start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    return start.toLocaleDateString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  }
-
-  if (loading || onboardingLoading) {
     return (
-      <>
-        <style>{coursePageStyles}</style>
-        <main className="cp-root">
-          <div className="cp-loading-screen">
-            <div className="cp-loading-spinner" />
-            <p className="cp-loading-text">Loading course…</p>
+        <button
+            type="button"
+            className={styles.addBuddyButton}
+            disabled={buddyBusyIds.has(
+                studentId,
+            )}
+            onClick={() =>
+                void sendBuddyRequest(
+                    studentId,
+                )
+            }
+        >
+          <UserPlus size={14} />
+
+          {buddyBusyIds.has(
+              studentId,
+          )
+              ? "Sending…"
+              : "Add buddy"}
+        </button>
+    );
+  }
+
+  if (
+      onboardingLoading ||
+      (profile && loading)
+  ) {
+    return <CourseLoading />;
+  }
+
+  if (!profile) {
+    return (
+        <main
+            id="studygrouprr-course"
+            className={styles.loadingPage}
+        >
+          <div className={styles.loadingCard}>
+            <strong>
+              We could not find your profile.
+            </strong>
+
+            <Link href="/login">
+              Return to sign in
+            </Link>
           </div>
         </main>
-      </>
+    );
+  }
+
+  if (
+      !isValidCourseCode(
+          courseCode,
+      )
+  ) {
+    return (
+        <main
+            id="studygrouprr-course"
+            className={styles.loadingPage}
+        >
+          <div className={styles.notFoundCard}>
+          <span
+              className={styles.notFoundIcon}
+          >
+            <SearchX size={28} />
+          </span>
+
+            <h1>Course unavailable</h1>
+
+            <p>
+              This course code is not valid.
+            </p>
+
+            <Link href="/sessions">
+              Browse sessions
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </main>
     );
   }
 
   return (
-    <>
-      <style>{coursePageStyles}</style>
-      <main className="cp-root">
+      <>
+        <main
+            id="studygrouprr-course"
+            className={styles.page}
+        >
+          <div className={styles.shell}>
+            <div className={styles.topBar}>
+              <Link href="/sessions">
+                <ArrowLeft size={16} />
+                Back to sessions
+              </Link>
 
-        {/* ── Hero Bar ── */}
-        <header className="cp-hero">
-          <div className="cp-hero-inner">
-            <div className="cp-hero-left">
-              <div>
-                <p className="cp-eyebrow">Course community</p>
-                <h1 className="cp-hero-name">{courseCode}</h1>
-                <p className="cp-hero-meta">
-                  <span>
-                    <CalendarDays size={13} className="cp-meta-icon" />
-                    {sessions.length} upcoming session{sessions.length !== 1 ? "s" : ""}
-                  </span>
-                  <span className="cp-dot-sep">·</span>
-                  <span>
-                    <Users size={13} className="cp-meta-icon" />
-                    {studentCount} student{studentCount !== 1 ? "s" : ""} studying
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            <div className="cp-hero-actions">
-              {!isMyCourse ? (
-                  <button
-                      onClick={addToMyCourses}
-                      disabled={savingCourse}
-                      className="cp-btn-secondary"
-                  >
-                    <Plus size={18} />
-                    {savingCourse
-                        ? "Adding..."
-                        : "Add To My Courses"}
-                  </button>
-              ) : (
-                  <div className="cp-course-added">
-                    <Check size={18} style={{ marginRight: 6 }} />
-                    In My Courses
-                  </div>
-              )}
-
-              <Link
-                  href={`/create-session?course=${courseCode}`}
-                  className="cp-btn-primary"
-              >
-                <Plus size={18} strokeWidth={2.5} />
-                Start a session
+              <Link href="/dashboard">
+                Dashboard
+                <ArrowRight size={15} />
               </Link>
             </div>
-          </div>
-        </header>
 
-        {/* ── Page Body ── */}
-        <div className="cp-body">
+            {loadError && (
+                <div
+                    className={styles.errorBanner}
+                    role="alert"
+                >
+                  <div>
+                    <strong>
+                      Course activity could not be refreshed
+                    </strong>
 
-          <button className="cp-back-btn" onClick={() => router.push("/sessions")}>
-            <ArrowLeft size={16} />
-            Back to sessions
-          </button>
+                    <span>{loadError}</span>
+                  </div>
 
-          <div className="cp-layout">
+                  <button
+                      type="button"
+                      onClick={() =>
+                          void loadCourse()
+                      }
+                  >
+                    Try again
+                  </button>
+                </div>
+            )}
 
-            {/* ── Sessions list ── */}
-            <section className="cp-card">
-              <div className="cp-card-header">
-                <h2 className="cp-card-title">Upcoming sessions</h2>
+            <header className={styles.header}>
+              <div className={styles.headerCopy}>
+                <p>
+                  {profile.university}
+                </p>
+
+                <h1>{courseCode}</h1>
+
+                <span>
+                Sessions and students currently
+                studying this course.
+              </span>
               </div>
 
-              {sessions.length === 0 ? (
-                <div className="cp-empty-state">
-                  <div className="cp-empty-icon">
-                    <BookOpen size={36} strokeWidth={1.8} />
-                  </div>
-                  <p className="cp-empty-heading">No sessions yet</p>
-                  <p className="cp-empty-sub">Be the first to start a {courseCode} study session.</p>
-                  <Link href={`/create-session?course=${courseCode}`} className="cp-empty-cta">
-                    Create Session
-                  </Link>
-                </div>
-              ) : (
-                <ul className="cp-session-list">
-                  {sessions.map((session) => {
-                    const urgency = getSessionUrgency(session.start_time);
-                    return (
-                      <li key={session.id}>
-                        <Link href={`/sessions/${session.id}`} className="cp-session-row">
-                          <div className={`cp-urgency-bar cp-urgency-bar--${urgency}`} />
-                          <div className="cp-session-info">
-                            <p className="cp-session-title">{session.title}</p>
-                            <div className="cp-session-meta-row">
-                              <span className="cp-tag">{session.course_code}</span>
-                              {session.location_name && (
-                                <span className="cp-session-loc">
-                                  <MapPin size={12} />
-                                  {session.location_name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className={`cp-session-time cp-session-time--${urgency}`}>
-                            {formatSessionTime(session.start_time)}
-                          </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-
-
-
-            {/* ── Right col: stats ── */}
-            <div className="cp-right-col">
-              <div className="cp-stat-row">
-                <div className="cp-stat-card">
-                  <CalendarDays size={18} className="cp-stat-icon" />
-                  <div>
-                    <p className="cp-stat-value">{sessions.length}</p>
-                    <p className="cp-stat-label">Sessions</p>
-                  </div>
-                </div>
-                <div className="cp-stat-card cp-stat-card--accent">
-                  <Users size={18} className="cp-stat-icon cp-stat-icon--accent" />
-                  <div>
-                    <p className="cp-stat-value cp-stat-value--accent">{studentCount}</p>
-                    <p className="cp-stat-label">Students</p>
-                  </div>
-                </div>
-              </div>
-
-              <section className="cp-card">
-
-                <div className="cp-card-header">
-
-                  <h2 className="cp-card-title">
-
-                    Live Right Now
-
-                  </h2>
-
-                </div>
-
-                {liveStudents.length === 0 ? (
-
-                    <p className="cp-live-empty">
-
-                      Nobody is studying live right now.
-
-                    </p>
-
+              <div className={styles.headerActions}>
+                {isMyCourse ? (
+                    <span
+                        className={styles.courseAdded}
+                    >
+                  <Check size={16} />
+                  In My Courses
+                </span>
                 ) : (
+                    <button
+                        type="button"
+                        className={styles.secondaryAction}
+                        disabled={savingCourse}
+                        onClick={() =>
+                            void addToMyCourses()
+                        }
+                    >
+                      <Plus size={16} />
 
-                    <div className="cp-live-list">
-
-                      {liveStudents.map((student) => (
-                          <div
-                              key={student.id}
-                              className="cp-live-card"
-                          >
-                            <div className="cp-live-header">
-                              <span className="cp-live-dot" />
-                              <span className="cp-live-badge">
-        Live
-      </span>
-                            </div>
-
-                            <div className="cp-live-user">
-                              <img
-                                  src={
-                                      student.profiles?.avatar_url ||
-                                      "/default-avatar.png"
-                                  }
-                                  alt=""
-                                  className="cp-live-avatar"
-                              />
-
-                              <div>
-                                <p className="cp-live-name">
-                                  {student.profiles?.name || "Student"}
-                                </p>
-
-                                <p className="cp-live-major">
-                                  {student.profiles?.major}
-                                  {student.profiles?.year
-                                      ? ` • ${student.profiles.year}`
-                                      : ""}
-                                </p>
-                              </div>
-                            </div>
-
-                            <p className="cp-live-location">
-                              <MapPin size={14} />
-                              {student.location_name}
-                            </p>
-
-                            {student.description && (
-                                <p className="cp-live-description">
-                                  {student.description}
-                                </p>
-                            )}
-
-                            {student.identification && (
-                                <p className="cp-live-identification">
-                                  {student.identification}
-                                </p>
-                            )}
-                          </div>
-                      ))}
-
-                    </div>
-
+                      {savingCourse
+                          ? "Adding…"
+                          : "Add to My Courses"}
+                    </button>
                 )}
 
-              </section>
-
-              <section className="cp-card cp-cta-card">
-                <p className="cp-cta-heading">Start a {courseCode} session</p>
-                <p className="cp-cta-body">
-                  Create a session and let classmates find you in real time.
-                </p>
                 <Link
-                  href={`/create-session?course=${courseCode}`}
-                  className="cp-btn-cta"
+                    href={`/create-session?course=${encodeURIComponent(
+                        courseCode,
+                    )}`}
+                    className={styles.primaryAction}
                 >
-                  <Plus size={16} strokeWidth={2.5} />
-                  Create Session
+                  <Plus size={17} />
+                  Create session
                 </Link>
-              </section>
-            </div>
+              </div>
+            </header>
 
+            <section
+                className={styles.summary}
+                aria-label="Course activity summary"
+            >
+              <SummaryItem
+                  icon={
+                    <CalendarDays size={17} />
+                  }
+                  value={sessions.length}
+                  label="Upcoming sessions"
+              />
+
+              <SummaryItem
+                  icon={<Users size={17} />}
+                  value={studentCount}
+                  label="Students involved"
+              />
+
+              <SummaryItem
+                  icon={<Radio size={17} />}
+                  value={
+                    activeLiveStudents.length
+                  }
+                  label="Studying live"
+              />
+            </section>
+
+            <div className={styles.contentGrid}>
+              <section className={styles.sessionsPanel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <h2>Course sessions</h2>
+
+                    <p>
+                      Upcoming meetups at your
+                      university.
+                    </p>
+                  </div>
+
+                  <Link
+                      href={`/create-session?course=${encodeURIComponent(
+                          courseCode,
+                      )}`}
+                  >
+                    Create one
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
+
+                {sessions.length > 0 ? (
+                    <div className={styles.sessionList}>
+                      {sessions.map((session) => (
+                          <SessionRow
+                              key={session.id}
+                              session={session}
+                              state={getSessionState(
+                                  session,
+                                  now,
+                              )}
+                              relativeTime={getRelativeStart(
+                                  session,
+                                  now,
+                              )}
+                              attendeeCount={
+                                  attendeeCounts[
+                                      session.id
+                                      ] ?? 1
+                              }
+                          />
+                      ))}
+                    </div>
+                ) : (
+                    <div className={styles.emptyState}>
+                  <span
+                      className={styles.emptyIcon}
+                  >
+                    <CalendarDays size={24} />
+                  </span>
+
+                      <div>
+                        <h3>
+                          No upcoming sessions
+                        </h3>
+
+                        <p>
+                          Be the first student to
+                          organize a {courseCode}
+                          meetup.
+                        </p>
+                      </div>
+
+                      <Link
+                          href={`/create-session?course=${encodeURIComponent(
+                              courseCode,
+                          )}`}
+                      >
+                        Create session
+                        <ArrowRight size={15} />
+                      </Link>
+                    </div>
+                )}
+              </section>
+
+              <aside className={styles.sidebar}>
+                <section className={styles.liveCard}>
+                  <div className={styles.sideHeader}>
+                    <div>
+                      <p>Live now</p>
+
+                      <h2>
+                        Studying {courseCode}
+                      </h2>
+                    </div>
+
+                    <span>
+                    {activeLiveStudents.length}
+                  </span>
+                  </div>
+
+                  {activeLiveStudents.length >
+                  0 ? (
+                      <div className={styles.liveList}>
+                        {activeLiveStudents.map(
+                            (student) => (
+                                <LiveStudentCard
+                                    key={student.id}
+                                    student={student}
+                                    currentTime={
+                                      currentTime
+                                    }
+                                    buddyAction={renderBuddyAction(
+                                        student.user_id,
+                                    )}
+                                />
+                            ),
+                        )}
+                      </div>
+                  ) : (
+                      <div
+                          className={styles.liveEmpty}
+                      >
+                        <Radio size={21} />
+
+                        <div>
+                          <strong>
+                            Nobody is live right now
+                          </strong>
+
+                          <span>
+                        Go live to let classmates
+                        know where you are studying.
+                      </span>
+                        </div>
+
+                        <Link href="/live">
+                          Go live
+                          <ArrowRight size={15} />
+                        </Link>
+                      </div>
+                  )}
+                </section>
+
+                <section className={styles.courseCard}>
+                  <div className={styles.courseCardIcon}>
+                    <BookOpen size={20} />
+                  </div>
+
+                  <div>
+                    <p>Course actions</p>
+
+                    <h2>{courseCode}</h2>
+
+                    <span>
+                    Create a scheduled meetup or
+                    share that you are studying
+                    right now.
+                  </span>
+                  </div>
+
+                  <div
+                      className={styles.courseActions}
+                  >
+                    <Link
+                        href={`/create-session?course=${encodeURIComponent(
+                            courseCode,
+                        )}`}
+                    >
+                      <CalendarDays size={16} />
+                      Create session
+                    </Link>
+
+                    <Link href="/live">
+                      <Radio size={16} />
+                      Go live
+                    </Link>
+                  </div>
+                </section>
+
+                {isMyCourse && (
+                    <section
+                        className={styles.savedCourseNote}
+                    >
+                      <Check size={17} />
+
+                      <div>
+                        <strong>
+                          Saved to My Courses
+                        </strong>
+
+                        <span>
+                      StudyGrouprr can prioritize
+                      this course in session and
+                      buddy recommendations.
+                    </span>
+                      </div>
+
+                      <Link href="/profile">
+                        Manage
+                        <ChevronRight size={15} />
+                      </Link>
+                    </section>
+                )}
+              </aside>
+            </div>
           </div>
-        </div>
-      </main>
-      <AlertModal
-          open={alertOpen}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          type={alertConfig.type}
-          onClose={() => setAlertOpen(false)}
-      />
-    </>
+        </main>
+
+        <AlertModal
+            open={alertOpen}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            type={alertConfig.type}
+            onClose={() =>
+                setAlertOpen(false)
+            }
+        />
+      </>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Scoped styles — cp- prefix
-───────────────────────────────────────────── */
-const coursePageStyles = `
+function SummaryItem({
+                       icon,
+                       value,
+                       label,
+                     }: {
+  icon: ReactNode;
+  value: number;
+  label: string;
+}) {
+  return (
+      <div className={styles.summaryItem}>
+      <span className={styles.summaryIcon}>
+        {icon}
+      </span>
 
-  /* ── Tokens / reset ── */
-  .cp-root * { box-sizing: border-box; }
-  .cp-root {
-    --indigo:     #1B1B3A;
-    --violet:     #7C3AED;
-    --violet-lt:  #EDE9FE;
-    --violet-mid: #A78BFA;
-    --green:      #10B981;
-    --amber:      #F59E0B;
-    --red:        #EF4444;
-    --sky:        #38BDF8;
-    --bg:         #F5F4FB;
-    --surface:    #FFFFFF;
-    --border:     #E4E2F0;
-    --text:       #1B1B3A;
-    --muted:      #64748B;
-    --faint:      #94A3B8;
-    background: var(--bg);
-    min-height: 100vh;
-    color: var(--text);
-  }
-  
-  .cp-live-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+        <div>
+          <strong>{value}</strong>
+          <span>{label}</span>
+        </div>
+      </div>
+  );
 }
 
-.cp-live-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  object-fit: cover;
+function SessionRow({
+                      session,
+                      state,
+                      relativeTime,
+                      attendeeCount,
+                    }: {
+  session: Session;
+  state: SessionState;
+  relativeTime: string;
+  attendeeCount: number;
+}) {
+  return (
+      <Link
+          href={`/sessions/${session.id}`}
+          className={styles.sessionRow}
+      >
+        <div className={styles.dateBlock}>
+        <span>
+          {new Date(
+              session.start_time,
+          ).toLocaleDateString([], {
+            weekday: "short",
+          })}
+        </span>
+
+          <strong>
+            {new Date(
+                session.start_time,
+            ).toLocaleDateString([], {
+              day: "numeric",
+            })}
+          </strong>
+        </div>
+
+        <div className={styles.sessionMain}>
+          <div className={styles.sessionTopline}>
+          <span
+              className={[
+                styles.sessionStatus,
+                state === "live"
+                    ? styles.sessionStatusLive
+                    : "",
+                state === "soon"
+                    ? styles.sessionStatusSoon
+                    : "",
+              ]
+                  .filter(Boolean)
+                  .join(" ")}
+          >
+            {state === "live" && (
+                <Radio size={12} />
+            )}
+
+            {getSessionStateLabel(
+                state,
+            )}
+          </span>
+
+            <span>
+            {relativeTime}
+          </span>
+          </div>
+
+          <h3>{session.title}</h3>
+
+          <div className={styles.sessionMeta}>
+          <span>
+            <Clock3 size={13} />
+            {formatSessionTimeRange(
+                session,
+            )}
+          </span>
+
+            <span>
+            <MapPin size={13} />
+              {session.location_name}
+          </span>
+
+            <span>
+            <Users size={13} />
+              {attendeeCount}{" "}
+              {attendeeCount === 1
+                  ? "student"
+                  : "students"}
+          </span>
+          </div>
+        </div>
+
+        <ChevronRight size={18} />
+      </Link>
+  );
 }
 
-.cp-live-name {
-  margin: 0;
-  font-weight: 700;
-  font-size: 14px;
+function LiveStudentCard({
+                           student,
+                           currentTime,
+                           buddyAction,
+                         }: {
+  student: LiveStudent;
+  currentTime: number;
+  buddyAction: ReactNode;
+}) {
+  return (
+      <article
+          className={styles.liveStudent}
+      >
+        <div
+            className={styles.liveStudentTop}
+        >
+          <div className={styles.avatar}>
+            <SafeAvatar
+                src={
+                  student.profile?.avatar_url
+                }
+                name={
+                  student.profile?.name
+                }
+            />
+          </div>
+
+          <div
+              className={styles.liveIdentity}
+          >
+            <div>
+              <strong>
+                {student.profile?.name ||
+                    "Campus student"}
+              </strong>
+
+              <span
+                  className={styles.liveBadge}
+              >
+              <Radio size={11} />
+              Live
+            </span>
+            </div>
+
+            <span>
+            {[
+                  student.profile?.major,
+                  student.profile?.year,
+                ]
+                    .filter(Boolean)
+                    .join(" · ") ||
+                "Student at your university"}
+          </span>
+          </div>
+
+          <span className={styles.liveDuration}>
+          {formatLiveDuration(
+              student.created_at,
+              currentTime,
+          )}
+        </span>
+        </div>
+
+        <div className={styles.liveLocation}>
+          <MapPin size={14} />
+
+          <span>
+          {student.location_name}
+        </span>
+        </div>
+
+        {student.description?.trim() && (
+            <p className={styles.liveDescription}>
+              {student.description}
+            </p>
+        )}
+
+        {student.identification?.trim() && (
+            <div
+                className={styles.identification}
+            >
+              <GraduationCap size={14} />
+
+              <span>
+            Find them:{" "}
+                {student.identification}
+          </span>
+            </div>
+        )}
+
+        <div className={styles.liveAction}>
+          {buddyAction}
+        </div>
+      </article>
+  );
 }
 
-.cp-live-major {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
+function CourseLoading() {
+  return (
+      <main
+          id="studygrouprr-course"
+          className={styles.loadingPage}
+          role="status"
+          aria-live="polite"
+      >
+        <div className={styles.loadingCard}>
+          <strong>
+            Loading course activity…
+          </strong>
+
+          <div
+              className={styles.loadingRows}
+              aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      </main>
+  );
 }
-
-  /* ── Loading ── */
-  .cp-loading-screen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    gap: 16px;
-  }
-  .cp-hero-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.cp-btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-
-  background: rgba(255,255,255,0.1);
-
-  border: 1px solid rgba(255,255,255,0.2);
-
-  color: white;
-
-  font-size: 15px;
-  font-weight: 600;
-
-  padding: 12px 22px;
-
-  border-radius: 12px;
-
-  cursor: pointer;
-
-  transition: all 0.15s ease;
-}
-
-.cp-live-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cp-live-card {
-  border: 1px solid #BBF7D0;
-  background: #F0FDF4;
-  border-radius: 14px;
-  padding: 14px;
-}
-
-.cp-live-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.cp-live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #10B981;
-}
-
-.cp-live-badge {
-  color: #059669;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.cp-live-location {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.cp-live-description {
-  margin: 0 0 6px;
-  font-size: 14px;
-}
-
-.cp-live-identification {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.cp-live-empty {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.cp-live-card {
-  padding: 12px;
-}
-
-.cp-live-location {
-  margin: 0 0 6px;
-}
-
-.cp-live-identification {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.cp-btn-secondary:hover {
-  background: rgba(255,255,255,0.18);
-}
-.cp-course-added {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 12px 22px;
-
-  border-radius: 12px;
-
-  background: rgba(16,185,129,0.15);
-
-  border: 1px solid rgba(16,185,129,0.3);
-
-  color: #A7F3D0;
-
-  font-size: 15px;
-  font-weight: 600;
-}
-  .cp-loading-spinner {
-    width: 36px; height: 36px;
-    border: 3px solid var(--border);
-    border-top-color: var(--violet);
-    border-radius: 50%;
-    animation: cp-spin 0.7s linear infinite;
-  }
-  @keyframes cp-spin { to { transform: rotate(360deg); } }
-  .cp-loading-text { font-size: 14px; color: var(--muted); margin: 0; }
-
-  /* ── Hero bar ── */
-  .cp-hero {
-    background: var(--indigo);
-    padding: 40px 24px 36px;
-  }
-  .cp-hero-inner {
-    max-width: 1100px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .cp-hero-left {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
-  .cp-eyebrow {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--violet-mid);
-    margin: 0 0 4px;
-  }
-  .cp-hero-name {
-    font-size: 36px;
-    font-weight: 700;
-    color: #fff;
-    margin: 0 0 6px;
-    line-height: 1.1;
-  }
-  .cp-hero-meta {
-    font-size: 14px;
-    color: rgba(255,255,255,0.5);
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .cp-hero-meta span {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .cp-dot-sep { color: rgba(255,255,255,0.25); }
-  .cp-meta-icon { opacity: 0.7; flex-shrink: 0; }
-
-  /* Primary button in hero */
-  .cp-btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--violet);
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    padding: 12px 22px;
-    border-radius: 12px;
-    text-decoration: none;
-    transition: background 0.15s, transform 0.1s;
-    flex-shrink: 0;
-  }
-  .cp-btn-primary:hover { background: #6D28D9; transform: translateY(-1px); }
-
-  /* ── Page body ── */
-  .cp-body {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 32px 24px 64px;
-  }
-
-  /* ── Back button ── */
-  .cp-back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    margin-bottom: 24px;
-    transition: color 0.15s;
-  }
-  .cp-back-btn:hover { color: var(--text); }
-
-  /* ── Two-column layout ── */
-  .cp-layout {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 20px;
-    align-items: start;
-  }
-  .cp-right-col {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  /* ── Card ── */
-  .cp-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 24px;
-    box-shadow: 0 4px 24px rgba(27,27,58,0.08);
-  }
-  .cp-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  .cp-card-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0;
-  }
-
-  /* ── Stats row ── */
-  .cp-stat-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-  .cp-stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    box-shadow: 0 4px 24px rgba(27,27,58,0.08);
-  }
-  .cp-stat-card--accent {
-    background: var(--violet-lt);
-    border-color: #C4B5FD;
-  }
-  .cp-stat-icon { color: var(--muted); }
-  .cp-stat-icon--accent { color: var(--violet); }
-  .cp-stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    line-height: 1;
-    margin: 0 0 2px;
-  }
-  .cp-stat-value--accent { color: var(--violet); }
-  .cp-stat-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 0;
-  }
-
-  /* ── CTA card ── */
-  .cp-cta-card { }
-  .cp-cta-eyebrow {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--violet-mid);
-    margin: 0 0 6px;
-  }
-  .cp-cta-heading {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 8px;
-  }
-  .cp-cta-body {
-    font-size: 14px;
-    color: var(--muted);
-    line-height: 1.5;
-    margin: 0 0 16px;
-  }
-  .cp-btn-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--violet);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    padding: 10px 20px;
-    border-radius: 10px;
-    text-decoration: none;
-    transition: background 0.15s, transform 0.1s;
-  }
-  .cp-btn-cta:hover { background: #6D28D9; transform: translateY(-1px); }
-
-  /* ── Empty state ── */
-  .cp-empty-state {
-    text-align: center;
-    padding: 40px 24px;
-    border: 2px dashed var(--border);
-    border-radius: 16px;
-  }
-  .cp-empty-icon {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 12px;
-  color: var(--violet);
-}
-  .cp-empty-heading { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
-  .cp-empty-sub { font-size: 14px; color: var(--muted); margin: 0 0 20px; }
-  .cp-empty-cta {
-    display: inline-flex;
-    background: var(--violet);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    padding: 10px 20px;
-    border-radius: 10px;
-    text-decoration: none;
-    transition: background 0.15s;
-  }
-  .cp-empty-cta:hover { background: #6D28D9; }
-
-  /* ── Session list ── */
-  .cp-session-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .cp-session-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    text-decoration: none;
-    color: inherit;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .cp-session-row:hover {
-    border-color: var(--violet-mid);
-    box-shadow: 0 2px 12px rgba(124,58,237,0.08);
-  }
-
-  /* Urgency bar */
-  .cp-urgency-bar {
-    width: 4px;
-    min-height: 44px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    align-self: stretch;
-  }
-  .cp-urgency-bar--live  { background: var(--red); }
-  .cp-urgency-bar--soon  { background: var(--amber); }
-  .cp-urgency-bar--today { background: var(--sky); }
-  .cp-urgency-bar--later { background: var(--border); }
-
-  .cp-session-info { flex: 1; min-width: 0; }
-  .cp-session-title {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0 0 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .cp-session-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .cp-tag {
-    background: var(--violet-lt);
-    color: var(--violet);
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 100px;
-  }
-  .cp-session-loc {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 12px;
-    color: var(--faint);
-  }
-
-  /* Time */
-  .cp-session-time {
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-  }
-  .cp-session-time--live  { color: var(--red); }
-  .cp-session-time--soon  { color: var(--amber); }
-  .cp-session-time--today { color: #0284C7; }
-  .cp-session-time--later { color: var(--muted); font-weight: 400; }
-
-  .cp-mini-pulse {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--red);
-    animation: cp-pulse 1.4s ease-out infinite;
-  }
-  @keyframes cp-pulse {
-    0%   { transform: scale(1); opacity: 0.4; }
-    70%  { transform: scale(2); opacity: 0; }
-    100% { transform: scale(1); opacity: 0; }
-  }
-
-  /* ── Responsive ── */
-  @media (max-width: 860px) {
-    .cp-layout { grid-template-columns: 1fr; }
-    .cp-right-col { order: -1; }
-    .cp-hero-name { font-size: 28px; }
-    .cp-hero-inner { flex-direction: column; align-items: flex-start; }
-    .cp-btn-primary { width: 100%; justify-content: center; }
-  }
-  @media (max-width: 520px) {
-    .cp-hero { padding: 28px 16px; }
-    .cp-body { padding: 20px 16px 48px; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .cp-mini-pulse { animation: none; }
-    .cp-btn-primary:hover,
-    .cp-btn-cta:hover { transform: none; }
-  }
-`;

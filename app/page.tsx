@@ -8,6 +8,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -305,7 +306,6 @@ export default function HomePage() {
         <ProblemSection />
         <CampusNetworkSection />
         <FinalCallToAction />
-        <HomeFooter />
       </main>
   );
 }
@@ -314,7 +314,14 @@ function LoadingScreen({ redirecting }: { redirecting: boolean }) {
   return (
       <main className={styles.loading} role="status" aria-live="polite">
       <span className={styles.loadingMark} aria-hidden="true">
-        <BookOpen size={21} strokeWidth={2.4} />
+        <Image
+            src="/navbar-logo.png"
+            alt=""
+            width={30}
+            height={30}
+            priority
+            className={styles.loadingLogo}
+        />
       </span>
         <span className={styles.loadingLine} aria-hidden="true" />
         <p>{redirecting ? "Opening your campus…" : "Loading StudyGrouprr…"}</p>
@@ -455,10 +462,7 @@ function HeroApplication() {
         <article className={styles.liveStudentCard}>
           <Avatar initial="S" tone="violet" />
           <div className={styles.liveStudentCopy}>
-            <p>
-              <span className={styles.statusDot} aria-hidden="true" />
-              Sarah is studying now
-            </p>
+            <p>Sarah is studying now</p>
             <strong>Algorithms and dynamic programming</strong>
             <small>
               <MapPin size={12} /> Memorial Library · 0.3 miles
@@ -741,11 +745,6 @@ function ProductExperience({
             {activeTab === "live" ? <LiveActivityPanel /> : <SessionsPanel />}
           </div>
         </div>
-
-        <div className={styles.productAnnotations} aria-hidden="true">
-          <span>see your course first</span>
-          <span>join without starting a group chat</span>
-        </div>
       </section>
   );
 }
@@ -778,9 +777,7 @@ function LiveActivityPanel() {
               </span>
                 </div>
                 <div className={styles.studentStatus}>
-              <span>
-                <i aria-hidden="true" /> Started {student.started}
-              </span>
+                  <span>Started {student.started}</span>
                   <Link href="/login">View</Link>
                 </div>
               </article>
@@ -931,13 +928,7 @@ function ProblemSection() {
 
         <div className={styles.problemShell}>
           <div className={`${styles.problemIntro} ${styles.reveal}`}>
-            <div className={styles.problemIntroTop}>
-              <p className={styles.darkKicker}>Why this needs to exist</p>
-
-              <span className={styles.problemIndex} aria-hidden="true">
-              03 / THE GAP
-            </span>
-            </div>
+            <p className={styles.darkKicker}>Why this needs to exist</p>
 
             <div className={styles.problemHeadlineRow}>
               <h2>
@@ -959,37 +950,29 @@ function ProblemSection() {
                 <span>Without StudyGrouprr</span>
               </div>
 
-              <blockquote>
-                “I need someone to study CS400 with.”
-              </blockquote>
+              <blockquote>“I need someone to study CS400 with.”</blockquote>
 
               <ul>
                 <li>
                   <span>Group chat</span>
                   <strong>147 unread messages</strong>
                 </li>
-
                 <li>
                   <span>Course server</span>
                   <strong>Nobody replies</strong>
                 </li>
-
                 <li>
                   <span>Library</span>
                   <strong>No idea who is in CS400</strong>
                 </li>
               </ul>
 
-              <div className={styles.problemBeforeNote}>
+              <p className={styles.problemBeforeNote}>
                 The people are nearby. The signal is missing.
-              </div>
+              </p>
             </div>
 
             <div className={styles.problemBridge} aria-hidden="true">
-            <span className={styles.problemBridgeLabel}>
-              StudyGrouprr
-            </span>
-
               <div className={styles.problemBridgeLine}>
                 <span />
                 <ArrowRight size={20} />
@@ -1004,27 +987,20 @@ function ProblemSection() {
 
               <div className={styles.problemCourseHeader}>
                 <div>
-                  <span>CS400</span>
+                  <span className={styles.courseBadge}>CS400</span>
                   <small>Algorithms</small>
                 </div>
 
-                <span className={styles.problemLiveBadge}>
-                <i aria-hidden="true" />
-                3 nearby
-              </span>
+                <span className={styles.problemLiveBadge}>3 nearby</span>
               </div>
 
               <article className={styles.problemResultCard}>
                 <Avatar initial="S" tone="violet" />
-
                 <div>
-                <span className={styles.problemResultStatus}>
-                  Studying now
-                </span>
+                  <span className={styles.problemResultStatus}>Studying now</span>
                   <strong>Sarah</strong>
                   <small>Memorial Library · 0.3 miles</small>
                 </div>
-
                 <ArrowRight size={16} />
               </article>
 
@@ -1032,31 +1008,19 @@ function ProblemSection() {
               <span className={styles.problemResultIcon}>
                 <Clock3 size={17} />
               </span>
-
                 <div>
-                <span className={styles.problemResultStatus}>
-                  Starting soon
-                </span>
+                  <span className={styles.problemResultStatus}>Starting soon</span>
                   <strong>CS400 Midterm Review</strong>
                   <small>Union South · 6:00 PM</small>
                 </div>
-
                 <ArrowRight size={16} />
               </article>
             </div>
           </div>
 
           <div className={`${styles.problemPositioning} ${styles.reveal}`}>
-            <div className={styles.problemPositioningList}>
-              <span>Not an AI tutor</span>
-              <span>Not a notes app</span>
-              <span>Not another Discord server</span>
-            </div>
-
-            <div className={styles.problemPositioningAnswer}>
-              <small>The actual product</small>
-              <strong>A way to find people.</strong>
-            </div>
+            <p>Not an AI tutor. Not a notes app. Not another Discord server.</p>
+            <strong>A way to find people.</strong>
           </div>
         </div>
       </section>
@@ -1214,8 +1178,7 @@ function FinalCallToAction() {
         </div>
 
         <div className={styles.finalPin}>
-          <span className={styles.finalPinPulse} aria-hidden="true" />
-          <span className={styles.finalPinIcon}>
+        <span className={styles.finalPinIcon}>
           <MapPin size={21} />
         </span>
           <div>
@@ -1224,55 +1187,6 @@ function FinalCallToAction() {
           </div>
         </div>
       </section>
-  );
-}
-
-function HomeFooter() {
-  const year = new Date().getFullYear();
-
-  return (
-      <footer className={styles.footer}>
-        <div className={styles.footerTop}>
-          <div className={styles.footerBrand}>
-            <Link href="/" aria-label="StudyGrouprr home">
-            <span>
-              <BookOpen size={18} />
-            </span>
-              StudyGrouprr
-            </Link>
-            <p>
-              Find classmates studying your course and meet them on campus.
-            </p>
-          </div>
-
-          <div className={styles.footerLinks}>
-            <div>
-              <strong>Product</strong>
-              <a href="#campus-activity">Campus activity</a>
-              <Link href="/sessions">Sessions</Link>
-              <Link href="/live">Go live</Link>
-              <Link href="/buddies">Study buddies</Link>
-            </div>
-            <div>
-              <strong>Project</strong>
-              <a href="#why-it-exists">Why it exists</a>
-              <Link href="/login">Join campus</Link>
-              <a
-                  href="https://github.com/GreenTreeGaming/studygrouprr"
-                  target="_blank"
-                  rel="noreferrer"
-              >
-                GitHub
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.footerBottom}>
-          <span>© {year} StudyGrouprr</span>
-          <span>Built for students who study better together.</span>
-        </div>
-      </footer>
   );
 }
 

@@ -1,60 +1,213 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { gsap } from "gsap";
-import { supabase } from "@/lib/supabase";
-import { ArrowRight, ChevronDown, GraduationCap, BookOpen, Calendar } from "lucide-react";
-import universities from "@/data/universities.json";
-import majors from "@/data/majors.json";
-import { isEduEmail } from "@/lib/authRules";
+/* eslint-disable @next/next/no-img-element */
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  Check,
+  GraduationCap,
+  Mail,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+
 import AlertModal from "@/components/AlertModal";
+import majors from "@/data/majors.json";
+import universities from "@/data/universities.json";
+import { isEduEmail } from "@/lib/authRules";
+import { containsInappropriateContent } from "@/lib/contentModeration";
 import {
-  normalizeCourseCode,
   isValidCourseCode,
+  normalizeCourseCode,
 } from "@/lib/courseValidation";
-import {
-  containsInappropriateContent,
-} from "@/lib/contentModeration";
+import { supabase } from "@/lib/supabase";
+
+import styles from "./onboarding.module.css";
+
+type AlertType =
+    | "success"
+    | "error"
+    | "warning"
+    | "info";
+
+type AlertConfig = {
+  title: string;
+  message: string;
+  type: AlertType;
+};
+
+type Account = {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+};
+
+const YEARS = [
+  "Freshman",
+  "Sophomore",
+  "Junior",
+  "Senior",
+  "Graduate",
+];
+
+const MAX_COURSES = 10;
+
+function getInitial(
+    name: string | null | undefined,
+): string {
+  return (
+      name?.trim().charAt(0).toUpperCase() ||
+      "S"
+  );
+}
+
+function SafeAvatar({
+                      src,
+                      name,
+                    }: {
+  src: string | null | undefined;
+  name: string | null | undefined;
+}) {
+  const [imageFailed, setImageFailed] =
+      useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
+
+  const canRenderImage =
+      typeof src === "string" &&
+      src.trim().length > 0 &&
+      !imageFailed;
+
+  if (!canRenderImage) {
+    return (
+        <span aria-hidden="true">
+        {getInitial(name)}
+      </span>
+    );
+  }
+
+  return (
+      <img
+          src={src}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() =>
+              setImageFailed(true)
+          }
+      />
+  );
+}
+
+function arraysMatch(
+    first: string[],
+    second: string[],
+): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+
+  return first.every(
+      (value, index) =>
+          value === second[index],
+  );
+}
 
 export default function OnboardingPage() {
-  const [university, setUniversity] = useState("");
-  const [major, setMajor] = useState("");
-  const [year, setYear] = useState("");
-  const [showUniversitySuggestions, setShowUniversitySuggestions] = useState(false);
-  const [showMajorSuggestions, setShowMajorSuggestions] = useState(false);
-  const [showYearOptions, setShowYearOptions] = useState(false);
+  const router = useRouter();
+
   const [checkingAuth, setCheckingAuth] =
       useState(true);
 
-  const [courses, setCourses] = useState<string[]>([]);
-  const [courseInput, setCourseInput] = useState("");
-
-  const [pendingRedirect, setPendingRedirect] =
+  const [loadError, setLoadError] =
       useState<string | null>(null);
 
-  const [alertOpen, setAlertOpen] = useState(false);
+  const [account, setAccount] =
+      useState<Account | null>(null);
 
-  const [alertConfig, setAlertConfig] = useState({
-    title: "",
-    message: "",
-    type: "info" as
-        | "success"
-        | "error"
-        | "warning"
-        | "info",
-  });
+  const [university, setUniversity] =
+      useState("");
 
-  const router = useRouter();
+  const [major, setMajor] =
+      useState("");
+
+  const [year, setYear] =
+      useState("");
+
+  const [courses, setCourses] =
+      useState<string[]>([]);
+
+  const [initialCourses, setInitialCourses] =
+      useState<string[]>([]);
+
+  const [
+    initialUniversity,
+    setInitialUniversity,
+  ] = useState("");
+
+  const [initialMajor, setInitialMajor] =
+      useState("");
+
+  const [initialYear, setInitialYear] =
+      useState("");
+
+  const [courseInput, setCourseInput] =
+      useState("");
+
+  const [
+    universitySuggestionsOpen,
+    setUniversitySuggestionsOpen,
+  ] = useState(false);
+
+  const [
+    majorSuggestionsOpen,
+    setMajorSuggestionsOpen,
+  ] = useState(false);
+
+  const [saving, setSaving] =
+      useState(false);
+
+  const [
+    submitAttempted,
+    setSubmitAttempted,
+  ] = useState(false);
+
+  const [
+    pendingRedirect,
+    setPendingRedirect,
+  ] = useState<string | null>(null);
+
+  const [alertOpen, setAlertOpen] =
+      useState(false);
+
+  const [alertConfig, setAlertConfig] =
+      useState<AlertConfig>({
+        title: "",
+        message: "",
+        type: "info",
+      });
 
   function showAlert(
       title: string,
       message: string,
-      type:
-          | "success"
-          | "error"
-          | "warning"
-          | "info" = "info"
+      type: AlertType = "info",
   ) {
     setAlertConfig({
       title,
@@ -65,487 +218,1356 @@ export default function OnboardingPage() {
     setAlertOpen(true);
   }
 
-  useEffect(() => {
-    async function checkOnboarding() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+  const loadOnboarding =
+      useCallback(async () => {
+        setCheckingAuth(true);
+        setLoadError(null);
 
-        if (!user) {
-          router.replace("/");
-          return;
-        }
+        try {
+          const {
+            data: { user },
+            error: userError,
+          } =
+              await supabase.auth.getUser();
 
-        if (!isEduEmail(user.email)) {
-          await supabase.auth.signOut();
+          if (userError) {
+            throw userError;
+          }
 
-          setPendingRedirect("/");
+          if (!user) {
+            router.replace("/");
+            return;
+          }
 
-          showAlert(
-              "Student Email Required",
-              "StudyGrouprr is currently only available to students with a .edu email address.",
-              "warning"
-          );
+          if (!isEduEmail(user.email)) {
+            await supabase.auth.signOut();
 
-          return;
-        }
+            setPendingRedirect("/");
 
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("onboarding_complete")
-            .eq("id", user.id)
-            .single();
+            showAlert(
+                "Student email required",
+                "StudyGrouprr is currently available to students with a .edu email address.",
+                "warning",
+            );
 
-        if (profile?.onboarding_complete) {
-          router.push("/dashboard");
-        }
-      } finally {
-        setCheckingAuth(false);
-      }
-    }
+            return;
+          }
 
-    checkOnboarding();
-  }, []);
+          const [
+            profileResult,
+            coursesResult,
+          ] = await Promise.all([
+            supabase
+                .from("profiles")
+                .select(
+                    "name, university, major, year, onboarding_complete",
+                )
+                .eq("id", user.id)
+                .maybeSingle(),
 
-  const [filteredUniversities, setFilteredUniversities] = useState<typeof universities>([]);
-  const [filteredMajors, setFilteredMajors] = useState<typeof majors>([]);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
+            supabase
+                .from("user_courses")
+                .select("course_code")
+                .eq("user_id", user.id)
+                .order("course_code"),
+          ]);
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.from(".onboard-card", {
-        opacity: 0,
-        scale: 0.96,
-        y: 12,
-        duration: 0.7,
-        ease: "power3.out",
-      });
+          if (profileResult.error) {
+            throw profileResult.error;
+          }
 
-      gsap.from(".onboard-item", {
-        opacity: 0,
-        y: 16,
-        duration: 0.6,
-        stagger: 0.08,
-        delay: 0.15,
-        ease: "power3.out",
-      });
-    });
+          if (coursesResult.error) {
+            throw coursesResult.error;
+          }
 
-    return () => ctx.revert();
-  }, []);
+          if (
+              profileResult.data
+                  ?.onboarding_complete
+          ) {
+            router.replace(
+                "/dashboard",
+            );
+            return;
+          }
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (formRef.current && !formRef.current.contains(event.target as Node)) {
-        setShowUniversitySuggestions(false);
-        setShowMajorSuggestions(false);
-        setShowYearOptions(false);
-      }
-    }
+          const metadata =
+              user.user_metadata ?? {};
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+          const accountName =
+              profileResult.data?.name ||
+              metadata.full_name ||
+              metadata.name ||
+              user.email?.split("@")[0] ||
+              "Student";
 
-  const YEARS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"];
+          const avatarUrl =
+              metadata.avatar_url ||
+              metadata.picture ||
+              null;
 
-  const exactMajorMatch = majors.find(
-      (m) =>
-          m.major.toLowerCase() ===
-          major.trim().toLowerCase()
-  );
-  const isCustomMajor = major.trim().length > 0 && !exactMajorMatch;
+          const savedCourses =
+              Array.from(
+                  new Set(
+                      (coursesResult.data ?? [])
+                          .map((course) =>
+                              typeof course.course_code ===
+                              "string"
+                                  ? normalizeCourseCode(
+                                      course.course_code,
+                                  )
+                                  : "",
+                          )
+                          .filter(Boolean),
+                  ),
+              ).sort();
 
-  async function completeOnboarding() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const validUniversity = universities.some(
-        (school) =>
-            school.name.toLowerCase() ===
-            university.trim().toLowerCase()
-    );
-    const customMajor = major.trim();
-    if (
-        !exactMajorMatch &&
-        containsInappropriateContent(customMajor)
-    ) {
-      showAlert(
-          "Inappropriate Major",
-          "Please enter an appropriate major.",
-          "error"
-      );
-      return;
-    }
-
-    if (!exactMajorMatch && !/^[a-zA-Z\s&\-()]+$/.test(customMajor)) {
-      showAlert(
-          "Invalid Major",
-          "Please enter a valid major.",
-          "error"
-      );
-      return;
-    }
-
-    if (customMajor.length < 3) {
-      showAlert(
-          "Major Too Short",
-          "Major must be at least 3 characters long.",
-          "error"
-      );
-      return;
-    }
-
-    if (customMajor.length > 100) {
-      showAlert(
-          "Major Too Long",
-          "Major must be fewer than 100 characters.",
-          "error"
-      );
-      return;
-    }
-
-    if (!validUniversity) {
-      showAlert(
-          "Select a University",
-          "Please select a university from the provided list.",
-          "error"
-      );
-      return;
-    }
-
-    const { error } = await supabase
-        .from("profiles")
-        .update({
-          university,
-          major,
-          major_is_custom: isCustomMajor,
-          year,
-          onboarding_complete: true,
-        })
-        .eq("id", user.id);
-
-    if (error) {
-      showAlert(
-          "Unable to Save",
-          "Something went wrong while saving your profile. Please try again.",
-          "error"
-      );
-      return;
-    }
-
-    if (courses.length > 0) {
-      const courseRows = courses.map((course) => ({
-        user_id: user.id,
-        course_code: course,
-      }));
-
-      const { error: courseError } = await supabase
-          .from("user_courses")
-          .upsert(courseRows, {
-            onConflict: "user_id,course_code",
+          setAccount({
+            id: user.id,
+            name: accountName,
+            email: user.email || "",
+            avatarUrl,
           });
 
-      if (courseError) {
-        console.error(courseError);
+          const savedUniversity =
+              profileResult.data
+                  ?.university || "";
+
+          const savedMajor =
+              profileResult.data?.major ||
+              "";
+
+          const savedYear =
+              profileResult.data?.year ||
+              "";
+
+          setUniversity(savedUniversity);
+          setMajor(savedMajor);
+          setYear(savedYear);
+
+          setInitialUniversity(
+              savedUniversity,
+          );
+
+          setInitialMajor(savedMajor);
+          setInitialYear(savedYear);
+
+          setCourses(savedCourses);
+          setInitialCourses(
+              savedCourses,
+          );
+        } catch (error) {
+          console.error(
+              "Unable to load onboarding:",
+              error,
+          );
+
+          setLoadError(
+              error instanceof Error
+                  ? error.message
+                  : "Your onboarding details could not be loaded.",
+          );
+        } finally {
+          setCheckingAuth(false);
+        }
+      }, [router]);
+
+  useEffect(() => {
+    void loadOnboarding();
+  }, [loadOnboarding]);
+
+  const universityResults =
+      useMemo(() => {
+        const search =
+            university
+                .trim()
+                .toLowerCase();
+
+        if (!search) {
+          return universities.slice(
+              0,
+              8,
+          );
+        }
+
+        return universities
+            .filter((school) =>
+                school.name
+                    .toLowerCase()
+                    .includes(search),
+            )
+            .slice(0, 8);
+      }, [university]);
+
+  const majorResults =
+      useMemo(() => {
+        const search =
+            major.trim().toLowerCase();
+
+        if (!search) {
+          return majors.slice(0, 8);
+        }
+
+        return majors
+            .filter((item) =>
+                item.major
+                    .toLowerCase()
+                    .includes(search),
+            )
+            .slice(0, 8);
+      }, [major]);
+
+  const exactUniversity =
+      useMemo(
+          () =>
+              universities.find(
+                  (school) =>
+                      school.name.toLowerCase() ===
+                      university
+                          .trim()
+                          .toLowerCase(),
+              ) ?? null,
+          [university],
+      );
+
+  const exactMajor = useMemo(
+      () =>
+          majors.find(
+              (item) =>
+                  item.major.toLowerCase() ===
+                  major.trim().toLowerCase(),
+          ) ?? null,
+      [major],
+  );
+
+  const isCustomMajor =
+      major.trim().length > 0 &&
+      !exactMajor;
+
+  const normalizedCourseInput =
+      useMemo(
+          () =>
+              normalizeCourseCode(
+                  courseInput,
+              ),
+          [courseInput],
+      );
+
+  const courseInputValid =
+      normalizedCourseInput.length === 0 ||
+      isValidCourseCode(
+          normalizedCourseInput,
+      );
+
+  const missingFields = useMemo(
+      () => {
+        const missing: string[] = [];
+
+        if (!exactUniversity) {
+          missing.push("university");
+        }
+
+        if (major.trim().length < 3) {
+          missing.push("major");
+        }
+
+        if (!YEARS.includes(year)) {
+          missing.push("academic year");
+        }
+
+        return missing;
+      },
+      [
+        exactUniversity,
+        major,
+        year,
+      ],
+  );
+
+  const canContinue =
+      missingFields.length === 0;
+
+  const setupProgress =
+      useMemo(() => {
+        const checks = [
+          Boolean(exactUniversity),
+          major.trim().length >= 3,
+          YEARS.includes(year),
+          courses.length > 0,
+        ];
+
+        return {
+          completed:
+          checks.filter(Boolean)
+              .length,
+          total: checks.length,
+          percentage: Math.round(
+              (checks.filter(Boolean)
+                      .length /
+                  checks.length) *
+              100,
+          ),
+        };
+      }, [
+        courses.length,
+        exactUniversity,
+        major,
+        year,
+      ]);
+
+  const hasChanges =
+      Boolean(account) &&
+      (university.trim() !==
+          initialUniversity.trim() ||
+          major.trim() !==
+          initialMajor.trim() ||
+          year !== initialYear ||
+          !arraysMatch(
+              courses,
+              initialCourses,
+          ));
+
+  useEffect(() => {
+    function protectDraft(
+        event: BeforeUnloadEvent,
+    ) {
+      if (
+          !hasChanges ||
+          saving
+      ) {
+        return;
       }
+
+      event.preventDefault();
+      event.returnValue = "";
     }
 
-    router.push("/dashboard");
+    window.addEventListener(
+        "beforeunload",
+        protectDraft,
+    );
+
+    return () => {
+      window.removeEventListener(
+          "beforeunload",
+          protectDraft,
+      );
+    };
+  }, [hasChanges, saving]);
+
+  function addCourse() {
+    const courseCode =
+        normalizedCourseInput;
+
+    if (!courseCode) {
+      return;
+    }
+
+    if (
+        containsInappropriateContent(
+            courseCode,
+        )
+    ) {
+      showAlert(
+          "Invalid course",
+          "Remove inappropriate language from the course code.",
+          "warning",
+      );
+      return;
+    }
+
+    if (
+        !isValidCourseCode(
+            courseCode,
+        )
+    ) {
+      showAlert(
+          "Invalid course code",
+          "Use a course code such as CS400, MATH340, or BIO101.",
+          "warning",
+      );
+      return;
+    }
+
+    if (
+        courses.includes(
+            courseCode,
+        )
+    ) {
+      showAlert(
+          "Course already added",
+          `${courseCode} is already in your semester.`,
+          "info",
+      );
+      return;
+    }
+
+    if (
+        courses.length >=
+        MAX_COURSES
+    ) {
+      showAlert(
+          "Course limit reached",
+          `Add up to ${MAX_COURSES} courses during onboarding. You can manage them later from Profile.`,
+          "warning",
+      );
+      return;
+    }
+
+    setCourses((current) =>
+        [...current, courseCode].sort(),
+    );
+
+    setCourseInput("");
   }
 
-  useEffect(() => {
-    if (!university.trim()) {
-      setFilteredUniversities([]);
+  async function completeOnboarding(
+      event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (saving) {
       return;
     }
-    const matches = universities
-      .filter((school) => school.name.toLowerCase().includes(university.toLowerCase()))
-      .slice(0, 8);
-    setFilteredUniversities(matches);
-  }, [university]);
 
-  useEffect(() => {
-    if (!major.trim()) {
-      setFilteredMajors([]);
+    setSubmitAttempted(true);
+
+    if (!canContinue) {
+      showAlert(
+          "Complete the required details",
+          `Add your ${missingFields.join(
+              ", ",
+          )} before continuing.`,
+          "warning",
+      );
       return;
     }
-    const matches = majors
-      .filter((m) => m.major.toLowerCase().includes(major.toLowerCase()))
-      .slice(0, 8);
-    setFilteredMajors(matches);
-  }, [major]);
 
-  const canContinue = university.trim().length > 0 && major.trim().length >= 3 && year.length > 0;
+    const cleanedMajor =
+        major.trim();
 
-  if (checkingAuth && !alertOpen) {
-    return null;
+    if (
+        !exactMajor &&
+        containsInappropriateContent(
+            cleanedMajor,
+        )
+    ) {
+      showAlert(
+          "Invalid major",
+          "Remove inappropriate language from your major.",
+          "warning",
+      );
+      return;
+    }
+
+    if (
+        !exactMajor &&
+        !/^[a-zA-Z\s&\-()]+$/.test(
+            cleanedMajor,
+        )
+    ) {
+      showAlert(
+          "Invalid major",
+          "Use letters, spaces, ampersands, hyphens, or parentheses.",
+          "warning",
+      );
+      return;
+    }
+
+    if (
+        cleanedMajor.length < 3 ||
+        cleanedMajor.length > 100
+    ) {
+      showAlert(
+          "Invalid major",
+          "Your major must be between 3 and 100 characters.",
+          "warning",
+      );
+      return;
+    }
+
+    if (!account) {
+      showAlert(
+          "Account unavailable",
+          "Your Google account could not be loaded. Refresh the page and try again.",
+          "error",
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } =
+          await supabase.auth.getUser();
+
+      if (userError) {
+        throw userError;
+      }
+
+      if (!user) {
+        throw new Error(
+            "Your session expired. Please sign in again.",
+        );
+      }
+
+      const { error: profileError } =
+          await supabase
+              .from("profiles")
+              .update({
+                university:
+                exactUniversity!.name,
+                major: cleanedMajor,
+                major_is_custom:
+                isCustomMajor,
+                year,
+                onboarding_complete:
+                    true,
+              })
+              .eq("id", user.id);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      let courseError:
+          Error | null = null;
+
+      if (courses.length > 0) {
+        const { error } =
+            await supabase
+                .from("user_courses")
+                .upsert(
+                    courses.map(
+                        (courseCode) => ({
+                          user_id: user.id,
+                          course_code:
+                          courseCode,
+                        }),
+                    ),
+                    {
+                      onConflict:
+                          "user_id,course_code",
+                    },
+                );
+
+        if (error) {
+          courseError = new Error(
+              error.message,
+          );
+        }
+      }
+
+      window.dispatchEvent(
+          new CustomEvent(
+              "profile-updated",
+          ),
+      );
+
+      if (courseError) {
+        setPendingRedirect(
+            "/dashboard",
+        );
+
+        showAlert(
+            "Profile saved",
+            "Your account is ready, but some courses could not be saved. You can add them later from Profile.",
+            "warning",
+        );
+
+        return;
+      }
+
+      router.replace(
+          "/dashboard",
+      );
+    } catch (error) {
+      showAlert(
+          "Unable to finish setup",
+          error instanceof Error
+              ? error.message
+              : "Your profile could not be saved.",
+          "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (
+      checkingAuth &&
+      !alertOpen
+  ) {
+    return <OnboardingLoading />;
+  }
+
+  if (
+      loadError &&
+      !account
+  ) {
+    return (
+        <main
+            id="studygrouprr-onboarding"
+            className={styles.loadingPage}
+        >
+          <div className={styles.errorCard}>
+          <span
+              className={styles.errorIcon}
+          >
+            <ShieldCheck size={24} />
+          </span>
+
+            <h1>
+              Setup could not be loaded
+            </h1>
+
+            <p>{loadError}</p>
+
+            <button
+                type="button"
+                onClick={() =>
+                    void loadOnboarding()
+                }
+            >
+              Try again
+            </button>
+          </div>
+        </main>
+    );
   }
 
   return (
       <>
-      <style>{onboardStyles}</style>
-      <main className="ob-root">
-        <div ref={cardRef} className="onboard-card ob-card">
-          <div className="ob-header">
-            <p className="onboard-item ob-eyebrow">Welcome to</p>
-            <h1 className="onboard-item ob-title">StudyGrouprr</h1>
-            <p className="onboard-item ob-subtitle">
-              Tell us a little about yourself so we can help you find study partners.
-            </p>
-          </div>
+        <main
+            id="studygrouprr-onboarding"
+            className={styles.page}
+        >
+          <div className={styles.shell}>
+            <section
+                className={styles.introPanel}
+            >
+              <div>
+              <span
+                  className={styles.brandMark}
+              >
+                <Users size={20} />
+              </span>
 
-          <div ref={formRef} className="ob-form">
-            {/* University */}
-            <div className="onboard-item ob-field">
-              <label className="ob-label">
-                <GraduationCap size={14} className="ob-label-icon" />
-                University
-              </label>
-              <div className="ob-input-wrap">
-                <input
-                  placeholder="Search for your university…"
-                  value={university}
-                  onChange={(e) => {
-                    setUniversity(e.target.value);
-                    setShowUniversitySuggestions(true);
-                    setShowMajorSuggestions(false);
-                    setShowYearOptions(false);
-                  }}
-                  onFocus={() => {
-                    setShowUniversitySuggestions(true);
-                    setShowMajorSuggestions(false);
-                    setShowYearOptions(false);
-                  }}
-                  className="ob-input"
-                />
-
-                {showUniversitySuggestions && filteredUniversities.length > 0 && (
-                  <div className="ob-dropdown">
-                    {filteredUniversities.map((school) => (
-                      <button
-                        key={school.name}
-                        type="button"
-                        onClick={() => {
-                          setUniversity(school.name);
-                          setShowUniversitySuggestions(false);
-                        }}
-                        className="ob-option"
-                      >
-                        {school.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <p className="ob-university-hint">
-                Your university determines which students, study sessions, and live study groups you can see. Make sure you select the correct school.
-              </p>
-            </div>
-
-            {/* Major */}
-            <div className="onboard-item ob-field">
-              <label className="ob-label">
-                <BookOpen size={14} className="ob-label-icon" />
-                Major
-              </label>
-              <div className="ob-input-wrap">
-                <input
-                  placeholder="Search for your major…"
-                  value={major}
-                  onChange={(e) => {
-                    setMajor(e.target.value);
-                    setShowMajorSuggestions(true);
-                    setShowUniversitySuggestions(false);
-                    setShowYearOptions(false);
-                  }}
-                  onFocus={() => {
-                    setShowMajorSuggestions(true);
-                    setShowUniversitySuggestions(false);
-                    setShowYearOptions(false);
-                  }}
-                  className="ob-input"
-                />
-
-                {showMajorSuggestions && (filteredMajors.length > 0 || major.trim().length > 0) && (
-                  <div className="ob-dropdown">
-                    {filteredMajors.map((m) => (
-                      <button
-                        key={m.major}
-                        type="button"
-                        onClick={() => {
-                          setMajor(m.major);
-                          setShowMajorSuggestions(false);
-                        }}
-                        className="ob-option"
-                      >
-                        <div className="ob-option-title">{m.major}</div>
-                        <div className="ob-option-sub">{m.category}</div>
-                      </button>
-                    ))}
-
-                    {major.trim().length > 0 &&
-                      !filteredMajors.some((m) => m.major.toLowerCase() === major.toLowerCase()) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMajor(major.trim());
-                            setShowMajorSuggestions(false);
-                          }}
-                          className="ob-option ob-option--custom"
-                        >
-                          <div className="ob-option-title">Use "{major}"</div>
-                          <div className="ob-option-sub">Custom major — not in our list</div>
-                        </button>
-                      )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Courses */}
-            <div className="onboard-item ob-field">
-              <label className="ob-label">
-                <BookOpen size={14} className="ob-label-icon" />
-                Courses This Semester
-              </label>
-
-              <div className="ob-course-row">
-                <input
-                    value={courseInput}
-                    onChange={(e) =>
-                        setCourseInput(e.target.value.toUpperCase())
-                    }
-                    placeholder="CS400"
-                    className="ob-input"
-                />
-
-                <button
-                    type="button"
-                    className="ob-course-add"
-                    onClick={() => {
-                      const normalized =
-                          normalizeCourseCode(courseInput);
-
-                      if (!isValidCourseCode(normalized)) {
-                        showAlert(
-                            "Invalid Course",
-                            "Please enter a valid course code.",
-                            "error"
-                        );
-                        return;
-                      }
-
-                      if (!courses.includes(normalized)) {
-                        setCourses([
-                          ...courses,
-                          normalized,
-                        ]);
-                      }
-
-                      setCourseInput("");
-                    }}
+                <p
+                    className={styles.eyebrow}
                 >
-                  Add
-                </button>
+                  Welcome to StudyGrouprr
+                </p>
+
+                <h1>
+                  Set up your campus profile
+                </h1>
+
+                <p
+                    className={styles.introText}
+                >
+                  These details help show you
+                  relevant sessions, courses, and
+                  students at your university.
+                </p>
               </div>
 
-              {courses.length > 0 && (
-                  <div className="ob-course-chips">
-                    {courses.map((course) => (
-                        <div
-                            key={course}
-                            className="ob-course-chip"
-                        >
-                          <span>{course}</span>
+              {account && (
+                  <div
+                      className={
+                        styles.accountCard
+                      }
+                  >
+                    <div
+                        className={styles.avatar}
+                    >
+                      <SafeAvatar
+                          src={account.avatarUrl}
+                          name={account.name}
+                      />
+                    </div>
 
-                          <button
-                              type="button"
-                              className="ob-course-remove"
-                              onClick={() =>
-                                  setCourses(
-                                      courses.filter(
-                                          (c) => c !== course
-                                      )
-                                  )
-                              }
-                          >
-                            ×
-                          </button>
-                        </div>
-                    ))}
+                    <div>
+                      <small>
+                        Connected Google account
+                      </small>
+
+                      <strong>
+                        {account.name}
+                      </strong>
+
+                      <span>
+                    <Mail size={13} />
+                        {account.email}
+                  </span>
+                    </div>
+
+                    <Check size={18} />
                   </div>
               )}
 
-              <p className="ob-university-hint">
-                Add the classes you're taking this semester.
-              </p>
-            </div>
+              <div
+                  className={styles.benefits}
+              >
+                <Benefit
+                    icon={
+                      <GraduationCap
+                          size={17}
+                      />
+                    }
+                    title="Your campus"
+                    description="Only see relevant activity from students at your university."
+                />
 
-            {/* Year */}
-            <div className="onboard-item ob-field">
-              <label className="ob-label">
-                <Calendar size={14} className="ob-label-icon" />
-                Year
-              </label>
-              <div className="ob-input-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowYearOptions(!showYearOptions);
-                    setShowUniversitySuggestions(false);
-                    setShowMajorSuggestions(false);
-                  }}
-                  className="ob-select"
-                >
-                  <span className={year ? "" : "ob-placeholder"}>
-                    {year || "Select your year"}
-                  </span>
-                  <ChevronDown
-                    size={16}
-                    className={`ob-chevron ${showYearOptions ? "ob-chevron--open" : ""}`}
-                  />
-                </button>
+                <Benefit
+                    icon={<BookOpen size={17} />}
+                    title="Your courses"
+                    description="Prioritize sessions and classmates studying the same subjects."
+                />
 
-                {showYearOptions && (
-                  <div className="ob-dropdown">
-                    {YEARS.map((y) => (
-                      <button
-                        key={y}
-                        type="button"
-                        onClick={() => {
-                          setYear(y);
-                          setShowYearOptions(false);
-                        }}
-                        className={`ob-option ${y === year ? "ob-option--active" : ""}`}
-                      >
-                        {y}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <Benefit
+                    icon={<Users size={17} />}
+                    title="Better matches"
+                    description="Use your major and year to improve buddy recommendations."
+                />
               </div>
-            </div>
 
-            <button
-              onClick={completeOnboarding}
-              className="ob-submit"
-              disabled={!canContinue}
+              <div
+                  className={styles.progressCard}
+              >
+                <div>
+                  <span>Setup progress</span>
+
+                  <strong>
+                    {setupProgress.completed} of{" "}
+                    {setupProgress.total}
+                  </strong>
+                </div>
+
+                <div
+                    className={
+                      styles.progressTrack
+                    }
+                    aria-hidden="true"
+                >
+                <span
+                    style={{
+                      width: `${setupProgress.percentage}%`,
+                    }}
+                />
+                </div>
+
+                <small>
+                  Courses are optional, but adding at
+                  least one improves recommendations.
+                </small>
+              </div>
+            </section>
+
+            <section
+                className={styles.formPanel}
             >
-              Continue <ArrowRight size={18} />
-            </button>
+              <div
+                  className={styles.formHeader}
+              >
+                <div>
+                  <p>Account setup</p>
 
-            <p className="onboard-item ob-footnote">
-              You can always change this later from your profile page.
-            </p>
+                  <h2>
+                    Tell us about your studies
+                  </h2>
+                </div>
+
+                <span>
+                About 1 minute
+              </span>
+              </div>
+
+              <form
+                  className={styles.form}
+                  onSubmit={
+                    completeOnboarding
+                  }
+                  noValidate
+              >
+                <div className={styles.field}>
+                  <label htmlFor="onboarding-university">
+                  <span
+                      className={styles.fieldIcon}
+                  >
+                    <GraduationCap
+                        size={17}
+                    />
+                  </span>
+
+                    <span>
+                    <strong>
+                      University
+                    </strong>
+
+                    <small>
+                      Required · controls your
+                      campus network
+                    </small>
+                  </span>
+                  </label>
+
+                  <div
+                      className={
+                        styles.autocomplete
+                      }
+                  >
+                    <Search size={15} />
+
+                    <input
+                        id="onboarding-university"
+                        value={university}
+                        onFocus={() =>
+                            setUniversitySuggestionsOpen(
+                                true,
+                            )
+                        }
+                        onBlur={() => {
+                          window.setTimeout(
+                              () =>
+                                  setUniversitySuggestionsOpen(
+                                      false,
+                                  ),
+                              120,
+                          );
+                        }}
+                        onChange={(event) => {
+                          setUniversity(
+                              event.target.value,
+                          );
+
+                          setUniversitySuggestionsOpen(
+                              true,
+                          );
+                        }}
+                        placeholder="Search for your university"
+                        autoComplete="off"
+                        aria-invalid={Boolean(
+                            submitAttempted &&
+                            !exactUniversity,
+                        )}
+                    />
+
+                    {university && (
+                        <button
+                            type="button"
+                            aria-label="Clear university"
+                            onMouseDown={(event) =>
+                                event.preventDefault()
+                            }
+                            onClick={() =>
+                                setUniversity("")
+                            }
+                        >
+                          <X size={14} />
+                        </button>
+                    )}
+
+                    {universitySuggestionsOpen &&
+                        universityResults.length >
+                        0 && (
+                            <div
+                                className={
+                                  styles.suggestions
+                                }
+                            >
+                              {universityResults.map(
+                                  (school) => (
+                                      <button
+                                          key={
+                                            school.name
+                                          }
+                                          type="button"
+                                          onMouseDown={(
+                                              event,
+                                          ) =>
+                                              event.preventDefault()
+                                          }
+                                          onClick={() => {
+                                            setUniversity(
+                                                school.name,
+                                            );
+
+                                            setUniversitySuggestionsOpen(
+                                                false,
+                                            );
+                                          }}
+                                      >
+                                        <GraduationCap
+                                            size={14}
+                                        />
+
+                                        <span>
+                                {
+                                  school.name
+                                }
+                              </span>
+                                      </button>
+                                  ),
+                              )}
+                            </div>
+                        )}
+                  </div>
+
+                  {submitAttempted &&
+                      !exactUniversity && (
+                          <p
+                              className={
+                                styles.fieldError
+                              }
+                          >
+                            Select a university from the
+                            provided list.
+                          </p>
+                      )}
+                </div>
+
+                <div
+                    className={
+                      styles.twoColumnFields
+                    }
+                >
+                  <div className={styles.field}>
+                    <label htmlFor="onboarding-major">
+                    <span
+                        className={
+                          styles.fieldIcon
+                        }
+                    >
+                      <BookOpen size={17} />
+                    </span>
+
+                      <span>
+                      <strong>Major</strong>
+
+                      <small>Required</small>
+                    </span>
+                    </label>
+
+                    <div
+                        className={
+                          styles.autocomplete
+                        }
+                    >
+                      <Search size={15} />
+
+                      <input
+                          id="onboarding-major"
+                          value={major}
+                          maxLength={100}
+                          onFocus={() =>
+                              setMajorSuggestionsOpen(
+                                  true,
+                              )
+                          }
+                          onBlur={() => {
+                            window.setTimeout(
+                                () =>
+                                    setMajorSuggestionsOpen(
+                                        false,
+                                    ),
+                                120,
+                            );
+                          }}
+                          onChange={(event) => {
+                            setMajor(
+                                event.target.value,
+                            );
+
+                            setMajorSuggestionsOpen(
+                                true,
+                            );
+                          }}
+                          placeholder="Search or enter a major"
+                          autoComplete="off"
+                          aria-invalid={Boolean(
+                              submitAttempted &&
+                              major.trim().length <
+                              3,
+                          )}
+                      />
+
+                      {major && (
+                          <button
+                              type="button"
+                              aria-label="Clear major"
+                              onMouseDown={(event) =>
+                                  event.preventDefault()
+                              }
+                              onClick={() =>
+                                  setMajor("")
+                              }
+                          >
+                            <X size={14} />
+                          </button>
+                      )}
+
+                      {majorSuggestionsOpen &&
+                          (majorResults.length >
+                              0 ||
+                              major.trim()) && (
+                              <div
+                                  className={
+                                    styles.suggestions
+                                  }
+                              >
+                                {majorResults.map(
+                                    (item) => (
+                                        <button
+                                            key={
+                                              item.major
+                                            }
+                                            type="button"
+                                            onMouseDown={(
+                                                event,
+                                            ) =>
+                                                event.preventDefault()
+                                            }
+                                            onClick={() => {
+                                              setMajor(
+                                                  item.major,
+                                              );
+
+                                              setMajorSuggestionsOpen(
+                                                  false,
+                                              );
+                                            }}
+                                        >
+                                          <BookOpen
+                                              size={14}
+                                          />
+
+                                          <span>
+                                  <strong>
+                                    {
+                                      item.major
+                                    }
+                                  </strong>
+
+                                  <small>
+                                    {
+                                      item.category
+                                    }
+                                  </small>
+                                </span>
+                                        </button>
+                                    ),
+                                )}
+
+                                {major.trim() &&
+                                    !majorResults.some(
+                                        (item) =>
+                                            item.major.toLowerCase() ===
+                                            major
+                                                .trim()
+                                                .toLowerCase(),
+                                    ) && (
+                                        <button
+                                            type="button"
+                                            onMouseDown={(
+                                                event,
+                                            ) =>
+                                                event.preventDefault()
+                                            }
+                                            onClick={() =>
+                                                setMajorSuggestionsOpen(
+                                                    false,
+                                                )
+                                            }
+                                        >
+                                          <Plus
+                                              size={14}
+                                          />
+
+                                          <span>
+                                  <strong>
+                                    Use “
+                                    {major.trim()}
+                                    ”
+                                  </strong>
+
+                                  <small>
+                                    Custom major
+                                  </small>
+                                </span>
+                                        </button>
+                                    )}
+                              </div>
+                          )}
+                    </div>
+
+                    {submitAttempted &&
+                        major.trim().length <
+                        3 && (
+                            <p
+                                className={
+                                  styles.fieldError
+                                }
+                            >
+                              Enter a major with at least
+                              three characters.
+                            </p>
+                        )}
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor="onboarding-year">
+                    <span
+                        className={
+                          styles.fieldIcon
+                        }
+                    >
+                      <User size={17} />
+                    </span>
+
+                      <span>
+                      <strong>
+                        Academic year
+                      </strong>
+
+                      <small>Required</small>
+                    </span>
+                    </label>
+
+                    <select
+                        id="onboarding-year"
+                        value={year}
+                        onChange={(event) =>
+                            setYear(
+                                event.target.value,
+                            )
+                        }
+                        aria-invalid={Boolean(
+                            submitAttempted &&
+                            !YEARS.includes(
+                                year,
+                            ),
+                        )}
+                    >
+                      <option value="">
+                        Select year
+                      </option>
+
+                      {YEARS.map(
+                          (yearOption) => (
+                              <option
+                                  key={yearOption}
+                                  value={yearOption}
+                              >
+                                {yearOption}
+                              </option>
+                          ),
+                      )}
+                    </select>
+
+                    {submitAttempted &&
+                        !YEARS.includes(
+                            year,
+                        ) && (
+                            <p
+                                className={
+                                  styles.fieldError
+                                }
+                            >
+                              Select your academic year.
+                            </p>
+                        )}
+                  </div>
+                </div>
+
+                <div className={styles.courseSection}>
+                  <div
+                      className={
+                        styles.courseHeading
+                      }
+                  >
+                    <div>
+                    <span
+                        className={
+                          styles.fieldIcon
+                        }
+                    >
+                      <Sparkles size={17} />
+                    </span>
+
+                      <div>
+                        <strong>
+                          Current courses
+                        </strong>
+
+                        <small>
+                          Optional · improves session
+                          and buddy matching
+                        </small>
+                      </div>
+                    </div>
+
+                    <span>
+                    {courses.length}/
+                      {MAX_COURSES}
+                  </span>
+                  </div>
+
+                  <div
+                      className={styles.courseForm}
+                  >
+                    <label htmlFor="onboarding-course">
+                      <BookOpen size={15} />
+
+                      <input
+                          id="onboarding-course"
+                          value={courseInput}
+                          maxLength={9}
+                          onChange={(event) =>
+                              setCourseInput(
+                                  normalizeCourseCode(
+                                      event.target.value,
+                                  ),
+                              )
+                          }
+                          onKeyDown={(event) => {
+                            if (
+                                event.key === "Enter"
+                            ) {
+                              event.preventDefault();
+                              addCourse();
+                            }
+                          }}
+                          placeholder="Add a course, e.g. CS400"
+                          autoComplete="off"
+                      />
+
+                      {courseInput && (
+                          <button
+                              type="button"
+                              aria-label="Clear course code"
+                              onClick={() =>
+                                  setCourseInput("")
+                              }
+                          >
+                            <X size={14} />
+                          </button>
+                      )}
+                    </label>
+
+                    <button
+                        type="button"
+                        onClick={addCourse}
+                        disabled={
+                            !normalizedCourseInput ||
+                            !courseInputValid ||
+                            courses.length >=
+                            MAX_COURSES
+                        }
+                    >
+                      <Plus size={16} />
+                      Add
+                    </button>
+                  </div>
+
+                  {courseInput &&
+                      !courseInputValid && (
+                          <p
+                              className={
+                                styles.courseError
+                              }
+                          >
+                            Use a code such as CS400,
+                            MATH340, or BIO101.
+                          </p>
+                      )}
+
+                  {courses.length > 0 ? (
+                      <div
+                          className={
+                            styles.courseChips
+                          }
+                      >
+                        {courses.map(
+                            (course) => (
+                                <span key={course}>
+                          {course}
+
+                                  <button
+                                      type="button"
+                                      aria-label={`Remove ${course}`}
+                                      onClick={() =>
+                                          setCourses(
+                                              (current) =>
+                                                  current.filter(
+                                                      (
+                                                          savedCourse,
+                                                      ) =>
+                                                          savedCourse !==
+                                                          course,
+                                                  ),
+                                          )
+                                      }
+                                  >
+                            <X size={13} />
+                          </button>
+                        </span>
+                            ),
+                        )}
+                      </div>
+                  ) : (
+                      <p
+                          className={
+                            styles.courseHint
+                          }
+                      >
+                        You can skip this and add
+                        courses later from Profile.
+                      </p>
+                  )}
+                </div>
+
+                <div
+                    className={
+                      styles.submitSection
+                    }
+                >
+                  <div>
+                    <strong>
+                      {canContinue
+                          ? "Your profile is ready."
+                          : `Still needed: ${missingFields.join(
+                              ", ",
+                          )}.`}
+                    </strong>
+
+                    <span>
+                    You can update all of this later
+                    from Profile.
+                  </span>
+                  </div>
+
+                  <button
+                      type="submit"
+                      disabled={
+                          saving ||
+                          !canContinue
+                      }
+                  >
+                    {saving
+                        ? "Saving…"
+                        : "Continue to dashboard"}
+
+                    <ArrowRight size={17} />
+                  </button>
+                </div>
+              </form>
+            </section>
           </div>
-        </div>
-      </main>
+        </main>
+
         <AlertModal
             open={alertOpen}
             title={alertConfig.title}
@@ -555,7 +1577,8 @@ export default function OnboardingPage() {
               setAlertOpen(false);
 
               if (pendingRedirect) {
-                const destination = pendingRedirect;
+                const destination =
+                    pendingRedirect;
 
                 setPendingRedirect(null);
 
@@ -563,318 +1586,53 @@ export default function OnboardingPage() {
               }
             }}
         />
-    </>
+      </>
   );
 }
 
-const onboardStyles = `
-  .ob-root * { box-sizing: border-box; }
-  .ob-root {
-    --indigo:      #1B1B3A;
-    --violet:      #7C3AED;
-    --violet-lt:   #EDE9FE;
-    --violet-mid:  #A78BFA;
-    --green:       #10B981;
-    --red:         #EF4444;
-    --red-lt:      #FEF2F2;
-    --bg:          #F5F4FB;
-    --surface:     #FFFFFF;
-    --border:      #E4E2F0;
-    --text:        #1B1B3A;
-    --muted:       #64748B;
-    --faint:       #94A3B8;
+function Benefit({
+                   icon,
+                   title,
+                   description,
+                 }: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+      <div className={styles.benefit}>
+        <span>{icon}</span>
 
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    overflow-y: auto;
-    background: var(--indigo);
-    background-image:
-      radial-gradient(circle at 15% 20%, rgba(124,58,237,0.35), transparent 40%),
-      radial-gradient(circle at 85% 80%, rgba(56,189,248,0.18), transparent 45%);
-  }
-
-  .ob-card {
-    width: 100%;
-    max-width: 480px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 36px 32px;
-    box-shadow: 0 8px 32px rgba(27, 27, 58, 0.12);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .ob-header {
-    text-align: center;
-    margin-bottom: 28px;
-  }
-  .ob-eyebrow {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--violet);
-    margin: 0 0 6px;
-  }
-  .ob-title {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0 0 10px;
-    line-height: 1.1;
-  }
-  .ob-subtitle {
-    font-size: 14px;
-    color: var(--muted);
-    margin: 0;
-    line-height: 1.5;
-  }
-  
-  .ob-course-row {
-  display: flex;
-  gap: 8px;
+        <div>
+          <strong>{title}</strong>
+          <p>{description}</p>
+        </div>
+      </div>
+  );
 }
 
-.ob-course-row .ob-input {
-  flex: 1;
+function OnboardingLoading() {
+  return (
+      <main
+          id="studygrouprr-onboarding"
+          className={styles.loadingPage}
+          role="status"
+          aria-live="polite"
+      >
+        <div className={styles.loadingCard}>
+          <strong>
+            Preparing your account…
+          </strong>
+
+          <div
+              className={styles.loadingRows}
+              aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      </main>
+  );
 }
-
-.ob-course-add {
-  flex-shrink: 0;
-
-  background: var(--violet);
-  color: white;
-
-  border: none;
-  border-radius: 10px;
-
-  padding: 0 16px;
-
-  font-size: 14px;
-  font-weight: 600;
-
-  cursor: pointer;
-
-  transition: background 0.15s;
-}
-
-.ob-course-add:hover {
-  background: #6D28D9;
-}
-
-.ob-course-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.ob-course-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-
-  background: var(--violet-lt);
-  color: var(--violet);
-
-  border: 1px solid #DDD6FE;
-  border-radius: 999px;
-
-  padding: 6px 12px;
-
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.ob-course-remove {
-  border: none;
-  background: transparent;
-
-  color: var(--violet);
-
-  cursor: pointer;
-
-  font-size: 16px;
-  line-height: 1;
-
-  padding: 0;
-}
-
-.ob-course-remove:hover {
-  opacity: 0.7;
-}
-
-  .ob-form {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    width: 100%;
-  }
-
-  .ob-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-    .ob-university-hint {
-  margin: 2px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-  .ob-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-  .ob-label-icon { color: var(--violet-mid); }
-
-  .ob-input-wrap {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .ob-input {
-    width: 100%;
-    font-size: 14px;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .ob-input::placeholder { color: var(--faint); }
-  .ob-input:focus {
-    border-color: var(--violet-mid);
-    box-shadow: 0 0 0 3px var(--violet-lt);
-  }
-
-  .ob-select {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 14px;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    cursor: pointer;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .ob-select:hover { border-color: var(--violet-mid); }
-  .ob-placeholder { color: var(--faint); }
-  .ob-chevron {
-    color: var(--faint);
-    transition: transform 0.15s;
-    flex-shrink: 0;
-  }
-  .ob-chevron--open { transform: rotate(180deg); }
-
-  .ob-dropdown {
-    position: static;
-    width: 100%;
-    margin-top: 8px;
-    max-height: 180px;
-    overflow-y: auto;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: 0 8px 32px rgba(27, 27, 58, 0.12);
-  }
-  .ob-option {
-    display: block;
-    width: 100%;
-    padding: 10px 14px;
-    text-align: left;
-    font-size: 14px;
-    color: var(--text);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: background 0.1s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .ob-option:hover { background: var(--violet-lt); }
-  .ob-option--custom { border-top: 1px solid var(--border); }
-  .ob-option--active {
-    background: var(--violet-lt);
-    color: var(--violet);
-    font-weight: 600;
-  }
-  .ob-option-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text);
-  }
-  .ob-option-sub {
-    font-size: 12px;
-    color: var(--faint);
-    margin-top: 2px;
-  }
-
-  .ob-submit {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    background: var(--violet);
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    padding: 13px 22px;
-    border-radius: 12px;
-    border: none;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.1s, opacity 0.15s;
-    margin-top: 4px;
-    min-height: 48px;
-    visibility: visible;
-    opacity: 1;
-  }
-  .ob-submit:hover:not(:disabled) {
-    background: #6D28D9;
-    transform: translateY(-1px);
-  }
-  .ob-submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .ob-submit:disabled {
-    background: var(--violet);
-    opacity: 0.65;
-  }
-
-  .ob-footnote {
-    text-align: center;
-    font-size: 13px;
-    color: var(--muted);
-    margin: 0;
-    margin-top: 8px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ob-submit:hover:not(:disabled) { transform: none; }
-  }
-
-  @media (max-width: 520px) {
-    .ob-card { padding: 28px 20px; }
-    .ob-title { font-size: 26px; }
-  }
-`;

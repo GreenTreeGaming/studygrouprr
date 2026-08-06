@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+} from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -54,6 +60,15 @@ const homeNavigationItems = [
   },
 ] as const;
 
+type HomeSectionHref =
+    (typeof homeNavigationItems)[number]["href"];
+
+type HomeIndicator = {
+  left: number;
+  width: number;
+  visible: boolean;
+};
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -63,6 +78,24 @@ export default function Navbar() {
   const [pendingRequests, setPendingRequests] = useState(0);
   const [isLive, setIsLive] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  const [activeHomeSection, setActiveHomeSection] =
+      useState<HomeSectionHref>("#how-it-works");
+
+  const [homeIndicator, setHomeIndicator] =
+      useState<HomeIndicator>({
+        left: 0,
+        width: 0,
+        visible: false,
+      });
+
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  const homeLinksRef = useRef<HTMLDivElement | null>(null);
+
+  const homeLinkRefs = useRef<
+      Partial<Record<HomeSectionHref, HTMLAnchorElement | null>>
+  >({});
 
   const isHomePage = pathname === "/";
   const isLoginPage = pathname === "/login";
@@ -174,12 +207,170 @@ export default function Navbar() {
     };
   }, [profile?.id]);
 
+  useEffect(() => {
+    if (!isHomePage || profile) {
+      setScrollProgress(0);
+      setHomeIndicator({
+        left: 0,
+        width: 0,
+        visible: false,
+      });
+
+      return;
+    }
+
+    let animationFrame = 0;
+
+    function updateHomepageNavigation() {
+      animationFrame = 0;
+
+      const documentElement = document.documentElement;
+      const scrollableHeight =
+          documentElement.scrollHeight - window.innerHeight;
+
+      const nextProgress =
+          scrollableHeight > 0
+              ? Math.min(
+                  1,
+                  Math.max(0, window.scrollY / scrollableHeight),
+              )
+              : 0;
+
+      setScrollProgress(nextProgress);
+
+      const navbar =
+          document.querySelector<HTMLElement>(".sg-nav-header");
+
+      const navbarBottom =
+          navbar?.getBoundingClientRect().bottom ?? 0;
+
+      const activationLine = navbarBottom + 150;
+
+      let nextActiveSection: HomeSectionHref =
+          "#how-it-works";
+
+      for (const item of homeNavigationItems) {
+        const section = document.querySelector<HTMLElement>(
+            item.href,
+        );
+
+        if (!section) {
+          continue;
+        }
+
+        const sectionRect = section.getBoundingClientRect();
+
+        if (sectionRect.top <= activationLine) {
+          nextActiveSection = item.href;
+        }
+      }
+
+      setActiveHomeSection((current) =>
+          current === nextActiveSection
+              ? current
+              : nextActiveSection,
+      );
+
+      const activeLink =
+          homeLinkRefs.current[nextActiveSection];
+
+      const linksContainer = homeLinksRef.current;
+
+      if (!activeLink || !linksContainer) {
+        setHomeIndicator({
+          left: 0,
+          width: 0,
+          visible: false,
+        });
+
+        return;
+      }
+
+      setHomeIndicator({
+        left: activeLink.offsetLeft,
+        width: activeLink.offsetWidth,
+        visible: true,
+      });
+    }
+
+    function requestHomepageNavigationUpdate() {
+      if (animationFrame) {
+        return;
+      }
+
+      animationFrame = window.requestAnimationFrame(
+          updateHomepageNavigation,
+      );
+    }
+
+    updateHomepageNavigation();
+
+    window.addEventListener(
+        "scroll",
+        requestHomepageNavigationUpdate,
+        { passive: true },
+    );
+
+    window.addEventListener(
+        "resize",
+        requestHomepageNavigationUpdate,
+    );
+
+    return () => {
+      window.removeEventListener(
+          "scroll",
+          requestHomepageNavigationUpdate,
+      );
+
+      window.removeEventListener(
+          "resize",
+          requestHomepageNavigationUpdate,
+      );
+
+      if (animationFrame) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [isHomePage, profile]);
+
   function isRouteActive(href: string) {
     if (href === "/dashboard") {
       return pathname === href;
     }
 
     return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  function handleHomeNavigation(
+      event: MouseEvent<HTMLAnchorElement>,
+      href: HomeSectionHref,
+  ) {
+    const section = document.querySelector<HTMLElement>(href);
+
+    if (!section) {
+      return;
+    }
+
+    event.preventDefault();
+    setActiveHomeSection(href);
+
+    const navbar =
+        document.querySelector<HTMLElement>(".sg-nav-header");
+
+    const navbarHeight = navbar?.offsetHeight ?? 72;
+
+    const targetTop =
+        section.getBoundingClientRect().top +
+        window.scrollY -
+        navbarHeight -
+        22;
+
+    window.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: "smooth",
+    });
+
+    window.history.replaceState(null, "", href);
   }
 
   async function signOut() {
@@ -236,16 +427,56 @@ export default function Navbar() {
             </Link>
 
             {isHomePage && !profile ? (
-                <div className="sg-nav-public-links">
-                  {homeNavigationItems.map((item) => (
-                      <a
-                          key={item.href}
-                          href={item.href}
-                          className="sg-nav-public-link"
-                      >
-                        {item.label}
-                      </a>
-                  ))}
+                <div
+                    ref={homeLinksRef}
+                    className="sg-nav-public-links"
+                >
+    <span
+        className={[
+          "sg-nav-public-indicator",
+          homeIndicator.visible
+              ? "sg-nav-public-indicator--visible"
+              : "",
+        ]
+            .filter(Boolean)
+            .join(" ")}
+        style={
+          {
+            "--sg-indicator-left": `${homeIndicator.left}px`,
+            "--sg-indicator-width": `${homeIndicator.width}px`,
+          } as CSSProperties
+        }
+        aria-hidden="true"
+    />
+
+                  {homeNavigationItems.map((item) => {
+                    const active =
+                        activeHomeSection === item.href;
+
+                    return (
+                        <a
+                            key={item.href}
+                            ref={(element) => {
+                              homeLinkRefs.current[item.href] = element;
+                            }}
+                            href={item.href}
+                            className={[
+                              "sg-nav-public-link",
+                              active
+                                  ? "sg-nav-public-link--active"
+                                  : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            aria-current={active ? "location" : undefined}
+                            onClick={(event) =>
+                                handleHomeNavigation(event, item.href)
+                            }
+                        >
+                          {item.label}
+                        </a>
+                    );
+                  })}
                 </div>
             ) : profile ? (
                 <div className="sg-nav-app-links">
@@ -387,6 +618,19 @@ export default function Navbar() {
               {mobileOpen ? <X size={21} /> : <Menu size={21} />}
             </button>
           </nav>
+
+          {isHomePage && !profile && (
+              <div
+                  className="sg-nav-scroll-progress"
+                  aria-hidden="true"
+              >
+    <span
+        style={{
+          transform: `scaleX(${scrollProgress})`,
+        }}
+    />
+              </div>
+          )}
 
           {mobileOpen && (
               <>
@@ -612,6 +856,37 @@ const navbarStyles = `
   .sg-nav-header *::after {
     box-sizing: border-box;
   }
+  
+ .sg-nav-scroll-progress {
+  position: absolute;
+  right: 0;
+  bottom: -5px;
+  left: 0;
+  z-index: 6;
+  height: 5px;
+  overflow: hidden;
+  background: rgba(124, 58, 237, 0.14);
+  pointer-events: none;
+}
+
+.sg-nav-scroll-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(
+    90deg,
+    #6d28d9 0%,
+    #7c3aed 45%,
+    #8b5cf6 100%
+  );
+  box-shadow:
+    0 2px 8px rgba(124, 58, 237, 0.45),
+    0 0 14px rgba(124, 58, 237, 0.28);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 80ms linear;
+}
 
   .sg-nav-shell {
     display: flex;
@@ -703,22 +978,61 @@ const navbarStyles = `
   }
 
   .sg-nav-public-links,
-  .sg-nav-app-links {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: 18px;
-    padding: 4px;
-    border: 1px solid rgba(229, 226, 236, 0.86);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.65);
-  }
+.sg-nav-app-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 18px;
+  padding: 4px;
+  border: 1px solid rgba(229, 226, 236, 0.86);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.sg-nav-public-links {
+  position: relative;
+  isolation: isolate;
+}
+
+.sg-nav-public-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--sg-indicator-width, 0);
+  border: 1px solid rgba(124, 58, 237, 0.14);
+  border-radius: 10px;
+  background: var(--sg-nav-violet-soft);
+  box-shadow:
+    0 4px 12px rgba(124, 58, 237, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  opacity: 0;
+  transform:
+    translateX(var(--sg-indicator-left, 0))
+    scale(0.94);
+  transform-origin: center;
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease;
+  pointer-events: none;
+}
+
+.sg-nav-public-indicator--visible {
+  opacity: 1;
+  transform:
+    translateX(var(--sg-indicator-left, 0))
+    scale(1);
+}
 
   .sg-nav-public-link,
   .sg-nav-app-link {
     display: inline-flex;
     min-height: 36px;
     align-items: center;
+    position: relative;
+z-index: 1;
     justify-content: center;
     gap: 7px;
     padding: 0 13px;
@@ -733,14 +1047,28 @@ const navbarStyles = `
       box-shadow 150ms ease,
       transform 150ms ease;
   }
+  
+  .sg-nav-public-link--active {
+  color: var(--sg-nav-violet);
+}
 
-  .sg-nav-public-link:hover,
-  .sg-nav-app-link:hover {
-    background: white;
-    color: var(--sg-nav-indigo);
-    box-shadow: 0 4px 12px rgba(27, 27, 58, 0.06);
-    transform: translateY(-1px);
-  }
+.sg-nav-public-link--active:hover {
+  background: transparent;
+  color: var(--sg-nav-violet-dark);
+  box-shadow: none;
+  transform: none;
+}
+
+ .sg-nav-public-link:hover {
+  color: var(--sg-nav-violet-dark);
+}
+
+.sg-nav-app-link:hover {
+  background: white;
+  color: var(--sg-nav-indigo);
+  box-shadow: 0 4px 12px rgba(27, 27, 58, 0.06);
+  transform: translateY(-1px);
+}
 
   .sg-nav-app-link--active {
     background: var(--sg-nav-indigo);
@@ -1259,6 +1587,11 @@ const navbarStyles = `
     .sg-nav-mobile-panel {
       animation: none;
     }
+    
+    .sg-nav-public-indicator,
+.sg-nav-scroll-progress span {
+  transition: none;
+}
 
     .sg-nav-public-link,
     .sg-nav-app-link,
