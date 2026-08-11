@@ -1138,7 +1138,7 @@ export default function EditSessionPage() {
                 ).toISOString(),
             end_time:
                 new Date(
-                    normalizedForm.endTime,
+                    normalizedForm.startTime,
                 ).toISOString(),
           })
           .eq("id", id)
