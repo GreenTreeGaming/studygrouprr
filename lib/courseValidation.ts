@@ -1,8 +1,12 @@
+// export function normalizeCourseCode(input: string) {
+//     return input
+//         .trim()
+//         .toUpperCase()
+//         .replace(/[\s-]+/g, "");
+// }
+
 export function normalizeCourseCode(input: string) {
-    return input
-        .trim()
-        .toUpperCase()
-        .replace(/[\s-]+/g, "");
+    return input.trim();
 }
 
 export const COURSE_CODE_REGEX =
