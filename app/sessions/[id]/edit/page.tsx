@@ -426,16 +426,6 @@ export default function EditSessionPage() {
               sessionResult.data as SessionRecord;
 
           if (
-              session.creator_id !==
-              user.id
-          ) {
-            router.replace(
-                `/sessions/${id}`,
-            );
-            return;
-          }
-
-          if (
               new Date(
                   session.end_time,
               ).getTime() <
